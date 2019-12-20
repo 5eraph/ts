@@ -1,0 +1,291 @@
+int slice_bytes(slice s) {
+    return slice_bits(s) / 8;
+}
+
+int builder_bits(builder b) asm "BBITS";
+int builder_bytes(builder b) {
+    return builder_bits(b) / 8;
+}
+
+int leadingZeroes(slice s) asm "SDCNTLEAD0";
+
+cell emptyCell() asm "NULL";
+slice emptySlice() asm "NULL";
+
+(int, slice) getSubdomain(slice s) {
+    var subdomainB = begin_cell();
+    var hash = 0;
+    while ((hash == 0) & (slice_bytes(s) > 0)) {
+        (s, var byte) = s.load_bits(8);
+        var value = byte.preload_int(8);
+        if (value == 0) { ;; null byte = split
+            if (builder_bits(subdomainB) > 0) {
+                var subdomain = subdomainB.end_cell();
+                hash = cell_hash(subdomain);
+                ;; return (hash, s); branches should both return or both not return
+            }
+        } else {
+            subdomainB = subdomainB.store_slice(byte);
+        }
+    }
+    ifnot (hash == 0) {
+        return (hash, s);
+    }
+
+    ;; allow extraction of last level domain even if not ending with zero byte
+    var remainingBytes = builder_bytes(subdomainB);
+    if (remainingBytes > 0) {
+        var subdomain = subdomainB.end_cell();
+        var hash = cell_hash(subdomain);
+        return (hash, s);
+    }
+    ;; no domain found
+    return (0, s);
+}
+
+(int, slice) hasAdditionalDomain(slice s) {
+    var continue = -1;
+    var leading0 = s.leadingZeroes() / 8;
+    var remainingBits = s.slice_bits() / 8;
+    if (remainingBits == leading0) {
+        return (0, s);
+    }
+    ;; skip zero bytes 
+    return (-1, s.skip_bits(leading0));
+
+;;    while (continue & (slice_bytes(s) > 0)) {
+;;        (var newS, var byte) = s.load_bits(8);
+;;        var value = byte.preload_int(8);
+;;        ifnot (value == 0) {
+;;            continue = 0;
+;;        } else {
+;;            s = newS;
+;;        }
+;;    }
+;;    ifnot (continue) {
+;;        return (-1, s);
+;;    }
+;;    return (0, s);
+}
+
+cell setDictUValue(cell dict, int n, int k, cell v) {
+    (dict, var r) = dict.udict_delete?(n, k);
+    dict = dict.udict_set_ref(n, k, v);
+    return dict;
+}
+cell setDictIValue(cell dict, int n, int k, cell v) {
+    (dict, var r) = dict.idict_delete?(n, k); 
+    dict = dict.idict_set_ref(n, k, v);
+    return dict;
+}
+
+cell setSubdomain(cell dict, slice s, cell dnsRecord, int cat) {
+    (var subdomain, s) = getSubdomain(s);
+    var record = dict.udict_get_ref(256, subdomain);
+    
+    var value = new_dict();
+    var childTree = new_dict();
+    ifnot (record.cell_null?()) {
+        var recordS = record.begin_parse();
+        value = recordS~load_dict();
+        childTree = recordS~load_dict();
+    }
+
+    (var addtionalDomain, s) = hasAdditionalDomain(s); 
+    if (addtionalDomain == 0) { ;; we are at lowest level of recursion
+        if (cat == 0) { ;; we got dict
+            value = dnsRecord;
+        } else {
+            value = value.setDictIValue(16, cat, dnsRecord);
+        }
+    } else {
+        childTree = setSubdomain(childTree, s, dnsRecord, cat);
+    }
+
+    return dict.setDictUValue(256, subdomain, begin_cell().store_dict(value).store_dict(childTree).end_cell());
+}
+
+(cell, int, slice) resolveSubdomain(cell dict, slice s, int cat) {
+    (var subdomain, s) = getSubdomain(s);
+    var record = dict.udict_get_ref(256, subdomain);
+    
+    if (record.cell_null?()) {
+        return (emptyCell(), -1, s); 
+    }
+
+    ;; record found
+    var recordS = record.begin_parse();
+    var value = recordS~load_dict();
+
+    (var addtionalDomain, s) = hasAdditionalDomain(s); 
+    if (addtionalDomain == 0) { ;; we are at lowest level of recursion
+        if (cat == 0) { ;; we return whole dict
+            return (value, 1, s);
+        } 
+        var dnsRecord = value.idict_get_ref(16, cat);
+        if (dnsRecord.cell_null?()) { ;; record not found, try pass to higher level next resolver
+            return (emptyCell(), -1, s); 
+        }
+        return (dnsRecord, 1, s);
+    } 
+    
+    ;; we have another lower level subdomain to process 
+    ;; get subdomains of this subdomain
+    var childTree = recordS~load_dict();
+    
+    (var childDnsResult, var res, var childS) = resolveSubdomain(childTree, s, cat);
+    if (res == 1) {
+        return (childDnsResult, res, childS);
+    } elseif (res == -2) {
+        return (childDnsResult, res, childS);
+    } else { ;; res == -1
+        ;; try get next dns resolver 
+        var dnsResolver = value.idict_get_ref(16, -1);
+        if (dnsResolver.cell_null?()) { ;; next resolver not found, try pass to higher level next resolver
+            return (emptyCell(), -1, s); 
+        }
+        return (dnsResolver, -2, s);
+    }
+}
+
+int setRecord(cell c, cell dnsRecord, int cat) {
+    var cs = get_data().begin_parse();
+    ;; skip owner pub key
+    var owner = cs~load_uint(256);
+    var rootDict = cs~load_dict();
+    cs.end_parse();
+    
+    var s = c.begin_parse();
+    rootDict = setSubdomain(rootDict, s, dnsRecord, cat);
+
+    set_data(begin_cell()
+        .store_uint(owner, 256)
+        .store_dict(rootDict)
+        .end_cell());
+    return -1;
+}
+
+
+(slice, slice, int) getRootDomainStore(slice s) {
+    var cs = get_data().begin_parse();
+    ;; skip owner pub key
+    var owner = cs~load_uint(256);
+
+    var rootDict = cs~load_dict();
+    cs.end_parse();
+
+    (var subdomain, s) = getSubdomain(s);
+
+    var record = rootDict.udict_get_ref(256, subdomain);
+    if (record.cell_null?()) { ;; root domain not found 
+        return (emptySlice(), s, 0);
+    }
+    var recordS = record.begin_parse();
+    return (recordS, s, -1);
+}
+
+;; Get methods
+;; returns length of resolved string and dnsrecord as slice or 0, nil of not matched
+(int, slice) dnsresolve(slice s, int cat) method_id {
+    throw_if(34, s.slice_empty?());
+
+    var oridinalLength = slice_bytes(s);
+    (var store, s, var f) = getRootDomainStore(s);
+    ifnot (f) { ;; root domain not found 
+        return (0, emptySlice());
+    }
+
+    var value = store~load_dict();
+    (var addtionalDomain, s) = hasAdditionalDomain(s); 
+    if (addtionalDomain == 0) { ;; we are at lowest level of recursion
+        if (cat == 0) {
+            return (oridinalLength, value.begin_parse());
+        } 
+
+        var dnsRecord = value.idict_get_ref(16, cat);
+        if (dnsRecord.cell_null?()) {
+            return (0, emptySlice()); 
+        }
+        return (oridinalLength, dnsRecord.begin_parse());
+    }
+
+    ;; there are subdomains to process so we load child tree
+    var childTree = store~load_dict();
+    (var childDnsResult, var res, var childS) = resolveSubdomain(childTree, s, cat);
+    
+    var resultDns = childDnsResult;
+    var resultS = childS;
+    if (res == -1) {
+        ;; try get next dns resolver from root
+        resultS = s;
+        var dnsResolver = value.idict_get_ref(16, -1);
+        ifnot (dnsResolver.cell_null?()) { ;; next resolver found, try pass to higher level next resolver
+            resultDns = dnsResolver;
+        }
+    }
+    var remainingBytes = slice_bytes(s);
+    var resolved_bytes = oridinalLength - remainingBytes;
+    return (resolved_bytes, resultDns.begin_parse());
+}
+
+cell removeSubdomain(cell dict, slice s, int cat) {
+    (var subdomain, s) = getSubdomain(s);
+    var record = dict.udict_get_ref(256, subdomain);
+
+    if (record.cell_null?()) {
+        return dict;
+    }
+
+    var recordS = record.begin_parse();
+    var value = recordS~load_dict();
+    var childTree = recordS~load_dict();
+
+    (var addtionalDomain, s) = hasAdditionalDomain(s); 
+    if (addtionalDomain == 0) { ;; we are at lowest level of recursion
+        if (cat == 0) { ;; we got dict
+            value = new_dict();
+        } else {
+            (value, var r) = value.idict_delete?(16, cat);
+        }
+    } else {
+        childTree = removeSubdomain(childTree, s, cat);
+    }
+
+    return dict.setDictUValue(256, subdomain, begin_cell().store_dict(value).store_dict(childTree).end_cell());
+}
+
+int removeRecord(cell c, int cat) {
+    var cs = get_data().begin_parse();
+    ;; skip owner pub key
+    var owner = cs~load_uint(256);
+    var rootDict = cs~load_dict();
+    cs.end_parse();
+    
+    var s = c.begin_parse();
+    rootDict = removeSubdomain(rootDict, s, cat);
+
+    set_data(begin_cell()
+        .store_uint(owner, 256)
+        .store_dict(rootDict)
+        .end_cell());
+    return -1;
+}
+
+
+
+(int, slice) main(slice s) impure {
+    var rootDict = new_dict();
+    var temp = begin_cell()
+        .store_uint(1000, 256)
+        .store_dict(rootDict)
+        .end_cell();
+    set_data(temp);
+    begin_cell().store_slice(s).end_cell()
+    var subdomain = s.toCell();
+    var dnsRecord = s.toCell();
+    var res = setRecord(subdomain, dnsRecord, 1);
+    res = removeRecord(subdomain, 1);
+    throw_unless(34, res == -1);
+    return dnsresolve(s, 1);
+}
+

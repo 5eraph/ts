@@ -1,0 +1,202 @@
+
+
+(int) recv_external(slice in_msg) impure {
+
+    var tc = begin_cell()
+    .store_slice(in_msg)
+    .end_cell();
+
+    return (cell_hash(tc));
+}
+
+(slice) elementAt(tuple t, int n) asm(t n -> 0) "[]";
+tuple newTuple() asm "|";
+tuple append(tuple t, int v) asm(t v -> 0) ",";
+int slice_bytes(slice s) asm "sbits 8 /";
+builder new_builder() asm "<b";
+builder append_byte(builder b, int b8) asm(b b8 -> 0) "B,";
+
+int tuple_len(tuple t) asm "count";
+
+(int, slice) getSubdomain(slice s) asm(s -> 1 0) "B{} swap 0 { dup 0= rot dup sbits rot and } { 1 B@+ swap dup dup Blen 8 * B>i@ 0 = { 3 roll dup Blen 0> { Bhash 3 roll drop swap drop B{} -rot } { 3 -roll drop swap } cond } { 3 roll swap B+ -rot swap } cond } while rot drop";
+
+(_, int, slice) resolveChild(slice s, cell tree, int cat) {
+    // var olds = s;
+    (var subdomain, s) = getSubdomain(s);
+    (var k, var record, var f) = rootDict~idict_get_next(256, subdomain);
+
+    ifnot (f) {
+        return (nil, -1, s); 
+    }
+
+    var value = record~load_dict();
+    if (value.null?()) {
+        ;; sub domain record has empty dictionary try next resolver 
+        return (nil, -1, s); 
+    }
+
+    var left_to_process = slice_bytes(s);
+    if (left_to_process == 0) {
+        if (cat == 0) {
+            return (value, 1, s)
+        }
+        (k, var dnsRecord, f) = value~idict_get_next(16, cat);
+        ifnot (f) {
+            ;; subdomain contains records, but not one we are looking for - return null, not found
+            return (nil, 0, s); 
+        }
+        return (dnsRecord, 1, s)
+    }
+    ;; we have another lower level subdomain to process 
+    ;; get subdomains of this subdomain
+    var childTree = record~load_dict();
+
+    ;; resolve child
+    (var childValue, f, childS) = resolveChild(s, childTree, cat);
+    if (f == 0) { ;; subdomain has records but not one we are looking for return nil, 0
+        return (nil, 0, s);
+    }
+    if (f == 1) { ;; found subdomain record
+        return (childValue, 1, s);
+    }
+    if (f == -2) { ;; found subdomain next resolver
+        return (childValue, -2, childS);
+    }
+    if (f == -1) { subdomain not in records, pass to next resolver
+        (k, var resolverRecord, f) = value~idict_get_next(16, -1);
+        ifnot (f) { ;; next resolver found, try pass to higher level next resolver
+            return (nil, -1); 
+        }
+        ;; next resolverFound - return "nextResolver record", "found next resolver"
+        return (resolverRecord, -2, s);
+    }       
+}
+
+(_, slice, int) getRootDomainStore(slice s) {
+    var cs = get_data().begin_parse();
+    var rootDict = cs~load_dict();
+    cs.end_parse();
+
+    (var subdomain, s) = getSubdomain(s);
+
+    (var k, var record, var f) = rootDict~idict_get_next(256, subdomain);
+    ifnot (f) { ;; root domain not found 
+        return (nil, s, 0);
+    }
+    return (record, s, -1);
+}
+
+;; msg_value = nanograms
+(int, _) recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+
+    var cs = in_msg_cell.begin_parse();
+    var flags = cs~load_uint(4);  ;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+    if (flags & 1) { ;; ignore all bounced messages
+        return (0, nil);
+    }
+
+    ;; var s_addr = cs~load_msg_addr();
+
+    int op = cs~load_uint(32);
+    if (op == 0) {
+        ;; resolve
+        if (in_msg.slice_empty?()) {
+            ;; inbound message has empty body
+            return (0, nil);
+        }
+    } elseif (op == 1) {
+        ;; register
+        if (in_msg.slice_empty?()) {
+            ;; inbound message has empty body
+            return (0, nil);
+        }
+    } else {
+
+    }
+    ;; op 3 - expiration date
+    ;; op 4 - extend
+    ;; op 5 - transfer
+    return (0, nil);
+}
+
+;; payment value 
+;; epxiration date 
+;; cat -2 owner - cab modify - extend, transfer
+;; resolve returns all categories if cat 0 or all of them as Hashmap
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    ;; estimateprice
+    ;; register/extend subdomain
+    ;; transfer subdomain
+    ;; inspect expiration
+
+}
+
+() recv_external(int msg_value, cell in_msg_cell, slice in_msg) {
+    ;; do nothing for external messages
+}
+
+
+;; Get methods
+
+
+;; returns length of resolved string and dnsrecord as slice or 0, nil of not matched
+(int, _) dnsresolve(slice s, int cat) method_id {
+    var oridinalLength = slice_bytes(s);
+    (var store, s, var f) = getRootDomainStore(s);
+    ifnot (f) { ;; root domain not found 
+        return (0, nil);
+    }
+
+    var validUntil = store~load_uint(32);
+    ifnot (validUntil < now()) { ;; root domain expired
+        return (0, nil);
+    }
+
+    var value = record~load_dict();
+    var left_to_process = slice_bytes(s);
+    if (left_to_process == 0) {
+        if (value.null?()) {
+            return return (0, nil); 
+        }
+
+        if (cat == 0) {
+            return (oridinalLength, value);
+        } 
+
+        (var k, var dnsRecord, f) = value~idict_get_next(16, cat);
+        ifnot (f) {
+            return (0, nil); 
+        }
+        return (oridinalLength, value);
+    }
+
+    ;; there are subdomains to process so we load child tree
+    var childTree = record~load_dict();
+    
+    ;; all subdomains can be resolve through resolveChild method
+    (var childValue, var f, childS) = resolveChild(s, childTree);
+    if (f == 0) { ;; subdomain has records but not one we are looking for return nil, 0
+        return (0, nil); 
+    }
+    if (f == 1) { ;; found subdomain record
+        return (oridinalLength, childValue);
+    }
+    uint resolver;
+    if (f == -2) {
+        s = childS;
+        resolver = childValue~load_uint(256);
+    } else {
+        (k, var resolverRecord, f) = value~idict_get_next(16, -1);
+        ifnot (f) { ;; next resolver found, try pass to higher level next resolver
+            return (0, nil); 
+        }
+        resolver = resolverRecord~load_uint(256);
+    }
+
+
+    var remainingBytes = slice_bytes(s);
+    var resolved_bytes = oridinalLength - remainingBytes;
+    ;; return resolved bytes and next resolver
+    return (resolved_bytes, resolver);
+}

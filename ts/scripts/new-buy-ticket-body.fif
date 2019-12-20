@@ -1,0 +1,30 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+{ ."usage: " @' $0 type ." <filename-base> <count>" cr
+    ."<count>     - number of tickets to buy" cr
+    ."Sets number of tickets available for sale." cr
+} : usage
+// 2- -2 and '
+$# 2 - 0< { usage bye } if
+
+false constant bounce
+
+$1 =: file-base
+$2 parse-int =: count
+
+file-base +".pk" load-keypair nip constant customer_pk
+
+60 constant timeout // timeout 60s
+
+now timeout + 32 << 1- dup =: query_id
+
+<b 1 3 u, query_id 64 u, customer_pk priv>pub B, count 8 u, b> constant msg
+
+dup ."signing message: " msg <s csr. cr
+msg hashu customer_pk ed25519_sign_uint constant signing_bin
+
+<b msg ref, <b signing_bin B, b> ref, b> 0 boc+>B
+."Buying tickets for" customer_pk priv>pub 256 B>i@ . 
+"bodies/buy-tickets-body.boc" tuck .s B>file
+."(Saved buy tickets body to file " type .")" cr

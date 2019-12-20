@@ -1,0 +1,56 @@
+"Asm.fif" include
+
+x{aabbcc00aabbcc}
+// x{000000}
+// x{0000aaaabb}
+PROGRAM{
+  DECLPROC slice_bytes
+  DECLPROC builder_bytes
+  DECLPROC main
+  slice_bytes PROC:<{
+    //  s
+    SBITS	//  _1
+    3 RSHIFT#	//  _3
+  }>
+  builder_bytes PROC:<{
+    //  b
+    BBITS	//  _1
+    3 RSHIFT#	//  _3
+  }>
+
+  main PROC:<{
+    //  s
+    -1 PUSHINT	//  s continue=-1
+    WHILE:<{
+      OVER	//  s continue s
+      slice_bytes CALLDICT	//  s continue _3
+      0 GTINT	//  s continue _5
+      s1 s(-1) PUXC	//  s continue continue _5
+      AND	//  s continue _6
+    }>DO<{	//  s continue
+      OVER	//  s continue s
+      8 LDSLICE	//  s continue byte newS
+      SWAP	//  s continue newS byte
+      8 PLDI	//  s continue newS value
+      0 EQINT	//  s continue newS _15
+      IF:<{	//  s continue newS
+        s2 POP	//  s continue
+      }>ELSE<{	//  s continue newS
+        2DROP	//  s
+        0 PUSHINT	//  s continue=0
+      }>
+    }>	//  s continue
+    IFNOTJMP:<{	//  s
+      -1 PUSHINT	//  s _17=-1
+      SWAP	//  _17=-1 s
+    }>	//  s
+    DROP	// 
+    0 PUSHINT	//  _18=0
+    NULL	//  _18=0 _19
+  }>
+}END>s =: code
+
+// dup csr.
+
+code
+runvmdict .s

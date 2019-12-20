@@ -1,0 +1,260 @@
+int slice_bytes(slice s) {
+    return slice_bits(s) / 8;
+}
+
+int builder_bits(builder b) asm "BBITS";
+int builder_bytes(builder b) {
+    return builder_bits(b) / 8;
+}
+
+cell emptyCell() asm "NULL";
+slice emptySlice() asm "NULL";
+
+cell toCell(slice s) {
+    return begin_cell().store_slice(s).end_cell();
+}
+cell uintToCell(int u,int n) {
+    return begin_cell().store_uint(u, n).end_cell();
+}
+;; (int, slice) getSubdomain(slice s) asm(s -> 1 0) "B{} swap 0 { dup 0= rot dup sbits rot and } { 1 B@+ swap dup dup Blen 8 * B>i@ 0 = { 3 roll dup Blen 0> { Bhash 3 roll drop swap drop B{} -rot } { 3 -roll drop swap } cond } { 3 roll swap B+ -rot swap } cond } while rot drop";
+
+(int, slice) getSubdomain(slice s) {
+    var subdomainB = begin_cell();
+    var hash = 0;
+    while ((hash == 0) & (slice_bytes(s) > 0)) {
+        (s, var byte) = s.load_bits(8);
+        var value = byte.preload_int(8);
+        if (value == 0) { ;; null byte = split
+            if (builder_bits(subdomainB) > 0) {
+                var subdomain = subdomainB.end_cell();
+                hash = cell_hash(subdomain);
+                ;; return (hash, s); branches should both return or both not return
+            }
+        } else {
+            subdomainB = subdomainB.store_slice(byte);
+        }
+    }
+    ifnot (hash == 0) {
+        return (hash, s);
+    }
+
+    ;; allow extraction of last level domain even if not ending with zero byte
+    var remainingBytes = builder_bytes(subdomainB);
+    if (remainingBytes > 0) {
+        var subdomain = subdomainB.end_cell();
+        var hash = cell_hash(subdomain);
+        return (hash, s);
+    }
+    ;; no domain found
+    return (0, s);
+}
+
+(int, slice) hasAdditionalDomain(slice s) {
+    var continue = -1;
+    while (continue & (slice_bytes(s) > 0)) {
+        (var newS, var byte) = s.load_bits(8);
+        var value = byte.preload_int(8);
+        ifnot (value == 0) {
+            continue = 0;
+        } else {
+            s = newS;
+        }
+    }
+    ifnot (continue) {
+        return (-1, s);
+    }
+    return (0, emptySlice());
+}
+
+(cell, int, slice) resolveChild(slice s, cell tree, int cat) {
+    (var subdomain, s) = getSubdomain(s);
+    (var k, var record, var f) = tree.udict_get_next?(256, subdomain);
+
+    ifnot (f) {
+        return (emptyCell(), -1, s); 
+    }
+
+    var value = record~load_dict();
+    if (value.null?()) {
+        ;; sub domain record has empty dictionary try next resolver 
+        return (emptyCell(), -1, s); 
+    }
+
+    ;; we have to check for another domain 
+    ;; check for trailing bytes wont help as these bytes may be zero bytes
+    (var addtionalDomain, s) = hasAdditionalDomain(s);
+    ;;var left_to_process = slice_bytes(s);
+    if (addtionalDomain == 0) {
+        if (cat == 0) {
+            return (value, 1, s);
+        }
+        (k, var dnsRecord, f) = value.idict_get_next?(16, cat);
+        ifnot (f) {
+            ;; subdomain contains records, but not one we are looking for - return null, not found
+            return (emptyCell(), 0, s); 
+        }
+        return (dnsRecord.toCell(), 1, s);
+    }
+    ;; we have another lower level subdomain to process 
+    ;; get subdomains of this subdomain
+    var childTree = record~load_dict();
+
+    ;; resolve child
+    (var childValue, f, var childS) = resolveChild(s, childTree, cat);
+    if (f == 0) { ;; subdomain has records but not one we are looking for return emptyCell, 0
+        return (emptyCell(), 0, s);
+    }
+    if (f == 1) { ;; found subdomain record
+        return (childValue, 1, s);
+    }
+    if (f == -2) { ;; found subdomain next resolver
+        return (childValue, -2, childS);
+    }
+    if (f == -1) { ;; subdomain not in records, pass to next resolver
+        (k, var resolverRecord, f) = value.idict_get_next?(16, -1);
+        ifnot (f) { ;; next resolver found, try pass to higher level next resolver
+            return (emptyCell(), -1, s); 
+        }
+        ;; next resolverFound - return "nextResolver record", "found next resolver"
+        return (resolverRecord.toCell(), -2, s);
+    }       
+    ;; this should not be reached ever
+    return (emptyCell(), 0, s);
+}
+
+(slice, slice, int) getRootDomainStore(slice s) {
+    var cs = get_data().begin_parse();
+    ;; skip owner pub key
+    var owner = cs~load_uint(256);
+
+    var rootDict = cs~load_dict();
+    cs.end_parse();
+
+    (var subdomain, s) = getSubdomain(s);
+
+    (var k, var record, var f) = rootDict.udict_get_next?(256, subdomain);
+    ifnot (f) { ;; root domain not found 
+        return (emptySlice(), s, 0);
+    }
+    return (record, s, -1);
+}
+
+int setSubdomain(cell c, cell dnsR, int cat) {
+    var cs = get_data().begin_parse();
+    var s = c.begin_parse();
+    var dnsRecord = dnsR.begin_parse();
+
+    ;; skip owner pub key
+    var owner = cs~load_uint(256);
+    var rootDict = cs~load_dict();
+    cs.end_parse();
+    
+    var dict = rootDict;
+    var set = 0;
+    
+    do {
+        (var subdomain, s) = getSubdomain(s);
+        (var k, var record, var f) = dict.udict_get_next?(256, subdomain);
+        ifnot (f) { ;; domain not found - create 
+            ;; prepare new dictionaries
+            var value = new_dict();
+            var childTree = new_dict();
+            dict~udict_set_builder(256, subdomain, begin_cell().store_dict(value).store_dict(childTree));
+        }
+
+        var remainingLength = slice_bytes(s);
+        if (remainingLength == 0) {;; we are on last level remove
+            var value = record~load_dict();
+            if (cat == 0) { ;; we got dict
+                var toStore = dnsRecord~load_dict();
+                dict~udict_set_builder(256, subdomain, begin_cell().store_dict(value).store_dict(toStore));
+            } else {
+                value~idict_set_builder(16, cat, begin_cell().store_slice(dnsRecord));
+            }
+            set = -1;
+        } else {
+            ;; skip value
+            var value = record~load_dict();
+            
+            ;; load nested tree
+            var dict = record~load_dict();
+        }
+    } until (~ set);
+
+    set_data(begin_cell()
+        .store_uint(owner, 256)
+        .store_dict(rootDict)
+        .end_cell());
+    return -1;
+}
+
+int main() impure {
+    set_data(begin_cell()
+        .store_uint(0, 256)
+        .store_dict(new_dict())
+        .end_cell());
+    var subdomain = begin_cell().store_int(1952805748, 256).end_cell();
+    var dnsRecord = begin_cell().store_int(1952805748, 256).end_cell();
+    var res = setSubdomain(subdomain, dnsRecord, 1);
+    return res;
+}
+
+;; returns length of resolved string and dnsrecord as slice or 0, nil of not matched
+;; (int, cell) dnsresolve(slice s, int cat) method_id {
+(int, cell) main(slice s, int cat) method_id {
+    throw_unless(34, init() == -1);
+    throw_if(34, s.slice_empty?());
+    var oridinalLength = slice_bytes(s);
+    (var store, s, var f) = getRootDomainStore(s);
+    ifnot (f) { ;; root domain not found 
+        return (0, emptyCell());
+    }
+
+    var value = store~load_dict();
+    var left_to_process = slice_bytes(s);
+    if (left_to_process == 0) {
+        if (value.null?()) {
+            return (0, emptyCell()); 
+        }
+
+        if (cat == 0) {
+            return (oridinalLength, value);
+        } 
+
+        (var k, var dnsRecord, f) = value.idict_get_next?(16, cat);
+        ifnot (f) {
+            return (0, emptyCell()); 
+        }
+        return (oridinalLength, value);
+    }
+
+    ;; there are subdomains to process so we load child tree
+    var childTree = store~load_dict();
+    
+    ;; all subdomains can be resolve through resolveChild method
+    (var childValue, var f, var childS) = resolveChild(s, childTree, cat);
+    if (f == 0) { ;; subdomain has records but not one we are looking for return nil, 0
+        return (0, emptyCell()); 
+    }
+    if (f == 1) { ;; found subdomain record
+        return (oridinalLength, childValue);
+    }
+    var resolver = 0;
+    if (f == -2) {
+        s = childS;
+        var cvs = childValue.begin_parse();
+        resolver = cvs~load_uint(256);
+    } else {
+        (var k, var resolverRecord, f) = value.idict_get_next?(16, -1);
+        if (f) { ;; next resolver found, try pass to higher level next resolver
+            resolver = resolverRecord~load_uint(256);
+        }
+    }
+    if (resolver == 0) {
+        return (0, emptyCell()); 
+    }
+    var remainingBytes = slice_bytes(s);
+    var resolved_bytes = oridinalLength - remainingBytes;
+    ;; return resolved bytes and next resolver
+    return (resolved_bytes, resolver.uintToCell(256));
+}

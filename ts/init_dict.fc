@@ -1,0 +1,9 @@
+cell pack_uint(int value, int length) {
+    return begin_cell().store_uint(value, length).end_cell();
+}
+
+cell main(int count) {
+    var dict = new_dict();
+    dict~udict_set_ref(256, 0, pack_uint(count, 24));
+    return dict;
+}

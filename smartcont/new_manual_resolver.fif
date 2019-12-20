@@ -1,0 +1,67 @@
+#!/usr/bin/env fift -s
+"TonUtil.fif" include
+"Asm.fif" include
+
+{ ."usage: " @' $0 type ." <workchain-id> [<filename-base>]" cr
+  ."Creates a new manual resolver in specified workchain, with private key saved to or loaded from <filename-base>.pk" cr
+  ."('new-resolver.pk' by default)" cr 1 halt
+} : usage
+$# 1- -2 and ' usage if
+
+$1 parse-workchain-id =: wc    // set workchain id from command line argument
+def? $2 { @' $2 } { "new-resolver" } cond constant file-base
+
+."Creating new wallet in workchain " wc . cr
+
+"4.fif" include dup constant code
+
+file-base +".pk" load-generate-keypair constant resolver_pk constant public_key
+
+// generate new rootDict
+// newDict is always empty null in current TVM
+// below line are for case of future change :)
+<{ NEWDICT }>s runvmcode drop constant rootDict
+
+<b public_key B, 
+    rootDict dict, // append root domaind dict 
+b> constant data
+cr cr 
+data .dump cr cr
+
+<b b{0011} s, code ref, data ref, null dict, b> constant state_init
+
+<b b{0011} s,  
+    code ref,       // append code
+    data ref,       // append data
+    null dict,      // append libraries
+b> constant state_init
+
+
+dup ."StateInit: " state_init <s csr. cr 
+
+<b 1 32 i, <b public_key B, b> ref, b> constant initmsg
+initmsg hash resolver_pk ed25519_sign_uint constant signing_bin
+
+state_init hashu wc swap 2dup 2constant resolver_addr
+
+."new manual resolver address = " 2dup .addr cr
+2dup file-base +".addr" save-address-verbose
+."Non-bounceable address (for init): " 2dup 7 .Addr cr
+."Bounceable address (for later access): " 6 .Addr cr
+
+<b 
+    b{1000100} s,    // append slice
+    resolver_addr addr, // append addr
+    b{000010} s,        // append slice
+    state_init ref,     // append initial state
+    b{0} s,             // append 0 bit 
+    signing_bin B,      // append signature
+    initmsg <s s,       // append msg
+b>                  // builder to cell
+
+dup ."External message for initialization is " <s csr. cr
+2 boc+>B // create bag of cells with crc32 embedded
+dup Bx. cr // prints bag of cells in hex
+
+file-base +"-query.boc" tuck B>file // saves query
+."(Saved resolver creating query to file " type .")" cr

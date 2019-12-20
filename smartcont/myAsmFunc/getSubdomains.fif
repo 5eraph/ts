@@ -1,0 +1,43 @@
+// slice S on top of the stack
+
+B{} swap | swap // B, T, S
+
+{ dup sbits }
+{
+    1 B@+           // B, T, S -> B, T, b, S    - returns first byte and remainder
+
+    swap            // B, T, b, S -> B, T, S, b 
+    dup dup Blen 8 * 
+    B>i@ 0 = {   // if b == 0
+        3 roll      // B, T, S, b -> T, S, b, B
+
+        dup Blen 0> {
+            Bhash       // T, S, b, B -> T, S, b, H - calculate hash from bytes
+            3 roll      // T, S, b, H -> S, b, H, T
+            swap        // S, b, H, T -> S, b, T, H
+            ,           // S, b, T, H -> S, b, T    - append hash to T
+            swap        // S, b, T -> S, T, b
+            drop        // S, T
+            B{}         // S, T, B
+            swap        // S, B, T
+            rot         // S, B, T -> B, T, S
+        }
+        {               // T, S, b, B
+            3 -roll     // T, S, b, B -> B, T, S, b
+            drop        // B, T, S, b -> B, T, S
+        } cond
+    } 
+    {               // B, T, S, b
+        3 roll      // B, T, S, b -> T, S, b, B
+        swap        // T, S, b, B -> T, S, B, b
+        B+          // T, S, B, b -> T, S, B
+        -rot        // T, S, B -> B, T, S
+    } cond
+} while
+rot // B, T, S -> T, S, B
+2drop 
+dup count // add count of subdomain to the top of the stack
+
+
+// one lined to
+B{} swap | swap { dup sbits } { 1 B@+ swap dup dup Blen 8 * B>i@ 0 = { 3 roll dup Blen 0> { Bhash 3 roll swap , swap drop B{} swap rot } { 3 -roll drop } cond } { 3 roll swap B+ -rot } cond } while rot 2drop dup count

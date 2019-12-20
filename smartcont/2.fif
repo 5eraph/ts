@@ -1,0 +1,546 @@
+// automatically generated from `./stdlib.fc` `./4.fc` 
+PROGRAM{
+  DECLPROC slice_bytes
+  DECLPROC builder_bytes
+  DECLPROC getSubdomain
+  DECLPROC hasAdditionalDomain
+  DECLPROC setDictUValue
+  DECLPROC setDictIValue
+  DECLPROC setSubdomain
+  DECLPROC setRecord
+  DECLPROC getRootDomainStore
+  DECLPROC resolveSubdomain
+  DECLPROC removeSubdomain
+  DECLPROC removeRecord
+  DECLPROC setOwner
+  123660 DECLMETHOD dnsresolve
+  102025 DECLMETHOD getOwner
+  DECLPROC recv_internal
+  DECLPROC recv_external
+  slice_bytes PROC:<{
+    //  s
+    SBITS	//  _1
+    3 RSHIFT#	//  _3
+  }>
+  builder_bytes PROC:<{
+    //  b
+    BBITS	//  _1
+    3 RSHIFT#	//  _3
+  }>
+  getSubdomain PROC:<{
+    //  s
+    NEWC	//  s subdomainB
+    0 PUSHINT	//  s subdomainB hash=0
+    WHILE:<{
+      DUP	//  s subdomainB hash hash
+      0 EQINT	//  s subdomainB hash _6
+      s3 PUSH	//  s subdomainB hash _6 s
+      slice_bytes CALLDICT	//  s subdomainB hash _6 _7
+      0 GTINT	//  s subdomainB hash _6 _9
+      AND	//  s subdomainB hash _10
+    }>DO<{	//  s subdomainB hash
+      s0 s2 XCHG	//  hash subdomainB s
+      8 LDSLICE	//  hash subdomainB byte s
+      OVER	//  hash subdomainB byte s byte
+      8 PLDI	//  hash subdomainB byte s value
+      0 EQINT	//  hash subdomainB byte s _18
+      IF:<{	//  hash subdomainB byte s
+        NIP	//  hash subdomainB s
+        OVER	//  hash subdomainB s subdomainB
+        BBITS	//  hash subdomainB s _19
+        0 GTINT	//  hash subdomainB s _21
+        IF:<{	//  hash subdomainB s
+          s2 POP	//  s subdomainB
+          DUP	//  s subdomainB subdomainB
+          ENDC	//  s subdomainB subdomain
+          HASHCU	//  s subdomainB hash
+        }>ELSE<{
+          s0 s2 XCHG	//  s subdomainB hash
+        }>
+      }>ELSE<{	//  hash subdomainB byte s
+        -ROT	//  hash s subdomainB byte
+        STSLICER	//  hash s subdomainB
+        ROT	//  s subdomainB hash
+      }>
+    }>	//  s subdomainB hash
+    DUP	//  s subdomainB hash hash
+    0 EQINT	//  s subdomainB hash _27
+    IFNOTJMP:<{	//  s subdomainB hash
+      NIP	//  s hash
+      SWAP	//  hash s
+    }>	//  s subdomainB hash
+    DROP	//  s subdomainB
+    DUP	//  s subdomainB subdomainB
+    builder_bytes CALLDICT	//  s subdomainB remainingBytes
+    0 GTINT	//  s subdomainB _31
+    IFJMP:<{	//  s subdomainB
+      ENDC	//  s subdomain
+      HASHCU	//  s hash
+      SWAP	//  hash s
+    }>	//  s subdomainB
+    DROP	//  s
+    0 PUSHINT	//  s _36=0
+    SWAP	//  _36=0 s
+  }>
+  hasAdditionalDomain PROC:<{
+    //  s
+    DUP	//  s s
+    SDCNTLEAD0	//  s _4
+    3 RSHIFT#	//  s leading0
+    OVER	//  s leading0 s
+    SBITS	//  s leading0 _8
+    3 RSHIFT#	//  s leading0 remainingBits
+    OVER	//  s leading0 remainingBits leading0
+    EQUAL	//  s leading0 _11
+    IFJMP:<{	//  s leading0
+      DROP	//  s
+      0 PUSHINT	//  s _12=0
+      SWAP	//  _12=0 s
+    }>	//  s leading0
+    SWAP
+    -1 PUSHINT
+    s0 s2 XCHG	//  _13=-1 s leading0
+    SDSKIPFIRST	//  _13=-1 _14
+  }>
+  setDictUValue PROC:<{
+    //  dict n k v
+    s1 s3 s2 PUXCPU	//  v n k k dict n
+    DICTUDEL	//  v n k _7 _8
+    DROP	//  v n k dict
+    ROT	//  v k dict n
+    DICTUSETREF	//  dict
+  }>
+  setDictIValue PROC:<{
+    //  dict n k v
+    s1 s3 s2 PUXCPU	//  v n k k dict n
+    DICTIDEL	//  v n k _7 _8
+    DROP	//  v n k dict
+    ROT	//  v k dict n
+    DICTISETREF	//  dict
+  }>
+  setSubdomain PROC:<{
+    //  dict s dnsRecord cat
+    s0 s2 XCHG	//  dict cat dnsRecord s
+    getSubdomain CALLDICT	//  dict cat dnsRecord subdomain s
+    s1 s4 PUSH2
+    8 PUSHPOW2	//  dict cat dnsRecord subdomain s subdomain dict _7=256
+    DICTUGETOPTREF	//  dict cat dnsRecord subdomain s record
+    NEWDICT	//  dict cat dnsRecord subdomain s record value
+    NEWDICT	//  dict cat dnsRecord subdomain s record value childTree
+    s2 PUSH	//  dict cat dnsRecord subdomain s record value childTree record
+    ISNULL	//  dict cat dnsRecord subdomain s record value childTree _13
+    IFNOT:<{	//  dict cat dnsRecord subdomain s record value childTree
+      2DROP	//  dict cat dnsRecord subdomain s record
+      CTOS	//  dict cat dnsRecord subdomain s recordS
+      LDDICT	//  dict cat dnsRecord subdomain s value recordS
+      LDDICT	//  dict cat dnsRecord subdomain s value _40 _39
+      DROP	//  dict cat dnsRecord subdomain s value childTree
+    }>ELSE<{
+      ROT
+      DROP	//  dict cat dnsRecord subdomain s value childTree
+    }>
+    s0 s2 XCHG	//  dict cat dnsRecord subdomain childTree value s
+    hasAdditionalDomain CALLDICT	//  dict cat dnsRecord subdomain childTree value addtionalDomain s
+    SWAP	//  dict cat dnsRecord subdomain childTree value s addtionalDomain
+    0 EQINT	//  dict cat dnsRecord subdomain childTree value s _23
+    IF:<{	//  dict cat dnsRecord subdomain childTree value s
+      DROP	//  dict cat dnsRecord subdomain childTree value
+      s4 PUSH	//  dict cat dnsRecord subdomain childTree value cat
+      0 EQINT	//  dict cat dnsRecord subdomain childTree value _25
+      IF:<{	//  dict cat dnsRecord subdomain childTree value
+        DROP
+        s3 POP	//  dict childTree value subdomain
+      }>ELSE<{	//  dict cat dnsRecord subdomain childTree value
+        s0 s2 XCHG
+        16 PUSHINT
+        s0 s5 s4 XCHG3	//  dict subdomain childTree value _26=16 cat dnsRecord
+        setDictIValue CALLDICT	//  dict subdomain childTree value
+        ROT	//  dict childTree value subdomain
+      }>
+    }>ELSE<{	//  dict cat dnsRecord subdomain childTree value s
+      s0 s4 s3 XCHG3
+      s0 s5 XCHG	//  dict subdomain value childTree s dnsRecord cat
+      setSubdomain CALLDICT	//  dict subdomain value childTree
+      s0 s2 XCHG	//  dict childTree value subdomain
+    }>
+    8 PUSHPOW2	//  dict childTree value subdomain _29=256
+    NEWC	//  dict childTree value subdomain _29=256 _30
+    s1 s3 XCHG	//  dict childTree _29=256 subdomain value _30
+    STDICT	//  dict childTree _29=256 subdomain _31
+    s1 s3 XCHG	//  dict subdomain _29=256 childTree _31
+    STDICT	//  dict subdomain _29=256 _32
+    ENDC	//  dict subdomain _29=256 _33
+    s1 s2 XCHG	//  dict _29=256 subdomain _33
+    setDictUValue CALLDICT	//  _34
+  }>
+  setRecord PROC:<{
+    //  s dnsRecord cat
+    s2 PUSH	//  s dnsRecord cat s
+    SEMPTY	//  s dnsRecord cat _4
+    32 THROWIF
+    c4 PUSH	//  s dnsRecord cat _7
+    CTOS	//  s dnsRecord cat cs
+    256 LDU	//  s dnsRecord cat owner cs
+    LDDICT	//  s dnsRecord cat owner rootDict cs
+    OVER	//  s dnsRecord cat owner rootDict cs rootDict
+    ISNULL	//  s dnsRecord cat owner rootDict cs _16
+    IF:<{	//  s dnsRecord cat owner rootDict cs
+      NIP	//  s dnsRecord cat owner cs
+      NEWDICT	//  s dnsRecord cat owner cs rootDict
+    }>ELSE<{
+      SWAP	//  s dnsRecord cat owner cs rootDict
+    }>
+    SWAP	//  s dnsRecord cat owner rootDict cs
+    ENDS
+    3 2 BLKSWAP	//  owner rootDict s dnsRecord cat
+    setSubdomain CALLDICT	//  owner rootDict
+    NEWC	//  owner rootDict _20
+    s1 s2 XCHG	//  rootDict owner _20
+    256 STU	//  rootDict _22
+    STDICT	//  _23
+    ENDC	//  _24
+    c4 POP
+  }>
+  getRootDomainStore PROC:<{
+    //  s
+    c4 PUSH	//  s _2
+    CTOS	//  s cs
+    256 LDU	//  s _24 _23
+    NIP	//  s cs
+    LDDICT	//  s rootDict cs
+    ENDS
+    SWAP	//  rootDict s
+    getSubdomain CALLDICT	//  rootDict subdomain s
+    s0 s2 XCHG
+    8 PUSHPOW2	//  s subdomain rootDict _15=256
+    DICTUGETOPTREF	//  s record
+    DUP	//  s record record
+    ISNULL	//  s record _17
+    IFJMP:<{	//  s record
+      DROP	//  s
+      NULL	//  s _18
+      SWAP
+      0 PUSHINT	//  _18 s _19=0
+    }>	//  s record
+    CTOS	//  s recordS
+    SWAP
+    -1 PUSHINT	//  recordS s _22=-1
+  }>
+  resolveSubdomain PROC:<{
+    //  dict s cat
+    SWAP	//  dict cat s
+    getSubdomain CALLDICT	//  dict cat subdomain s
+    s0 s3 XCHG
+    8 PUSHPOW2	//  s cat subdomain dict _6=256
+    DICTUGETOPTREF	//  s cat record
+    DUP	//  s cat record record
+    ISNULL	//  s cat record _8
+    IFJMP:<{	//  s cat record
+      2DROP	//  s
+      NULL	//  s _9
+      SWAP
+      -1 PUSHINT
+      SWAP	//  _9 _10=-1 s
+    }>	//  s cat record
+    CTOS	//  s cat recordS
+    LDDICT	//  s cat value recordS
+    s0 s3 XCHG	//  recordS cat value s
+    hasAdditionalDomain CALLDICT	//  recordS cat value addtionalDomain s
+    SWAP	//  recordS cat value s addtionalDomain
+    0 EQINT	//  recordS cat value s _19
+    IFJMP:<{	//  recordS cat value s
+      s3 POP	//  s cat value
+      OVER	//  s cat value cat
+      0 EQINT	//  s cat value _21
+      IFJMP:<{	//  s cat value
+        NIP	//  s value
+        SWAP
+        1 PUSHINT
+        SWAP	//  value _22=1 s
+      }>	//  s cat value
+      16 PUSHINT	//  s cat value _24=16
+      DICTIGETOPTREF	//  s dnsRecord
+      DUP	//  s dnsRecord dnsRecord
+      ISNULL	//  s dnsRecord _26
+      IFJMP:<{	//  s dnsRecord
+        DROP	//  s
+        NULL	//  s _27
+        SWAP
+        -1 PUSHINT
+        SWAP	//  _27 _28=-1 s
+      }>	//  s dnsRecord
+      SWAP
+      1 PUSHINT
+      SWAP	//  dnsRecord _29=1 s
+    }>	//  recordS cat value s
+    s0 s3 XCHG	//  s cat value recordS
+    LDDICT	//  s cat value _56 _55
+    DROP	//  s cat value childTree
+    s0 s3 s2 XCPUXC	//  s value childTree s cat
+    resolveSubdomain CALLDICT	//  s value childDnsResult res childS
+    OVER	//  s value childDnsResult res childS res
+    1 EQINT	//  s value childDnsResult res childS _38
+    IFJMP:<{	//  s value childDnsResult res childS
+      s3 POP
+      s3 POP	//  res childS childDnsResult
+      -ROT	//  childDnsResult res childS
+    }>	//  s value childDnsResult res childS
+    OVER	//  s value childDnsResult res childS res
+    -2 EQINT	//  s value childDnsResult res childS _40
+    IFJMP:<{	//  s value childDnsResult res childS
+      s3 POP
+      s3 POP	//  res childS childDnsResult
+      -ROT	//  childDnsResult res childS
+    }>	//  s value childDnsResult res childS
+    3 BLKDROP	//  s value
+    -1 PUSHINT	//  s value _42=-1
+    SWAP
+    16 PUSHINT	//  s _42=-1 value _43=16
+    DICTIGETOPTREF	//  s dnsResolver
+    DUP	//  s dnsResolver dnsResolver
+    ISNULL	//  s dnsResolver _45
+    IFJMP:<{	//  s dnsResolver
+      DROP	//  s
+      NULL	//  s _46
+      SWAP
+      -1 PUSHINT
+      SWAP	//  _46 _47=-1 s
+    }>	//  s dnsResolver
+    SWAP
+    -2 PUSHINT
+    SWAP	//  dnsResolver _48=-2 s
+  }>
+  removeSubdomain PROC:<{
+    //  dict s cat
+    SWAP	//  dict cat s
+    getSubdomain CALLDICT	//  dict cat subdomain s
+    s1 s3 PUSH2
+    8 PUSHPOW2	//  dict cat subdomain s subdomain dict _6=256
+    DICTUGETOPTREF	//  dict cat subdomain s record
+    DUP	//  dict cat subdomain s record record
+    ISNULL	//  dict cat subdomain s record _8
+    IFJMP:<{	//  dict cat subdomain s record
+      4 BLKDROP	//  dict
+    }>	//  dict cat subdomain s record
+    CTOS	//  dict cat subdomain s recordS
+    LDDICT	//  dict cat subdomain s value recordS
+    LDDICT	//  dict cat subdomain s value _39 _38
+    DROP	//  dict cat subdomain s value childTree
+    s0 s2 XCHG	//  dict cat subdomain childTree value s
+    hasAdditionalDomain CALLDICT	//  dict cat subdomain childTree value addtionalDomain s
+    SWAP	//  dict cat subdomain childTree value s addtionalDomain
+    0 EQINT	//  dict cat subdomain childTree value s _20
+    IF:<{	//  dict cat subdomain childTree value s
+      DROP	//  dict cat subdomain childTree value
+      s3 PUSH	//  dict cat subdomain childTree value cat
+      0 EQINT	//  dict cat subdomain childTree value _22
+      IF:<{	//  dict cat subdomain childTree value
+        DROP
+        s2 POP	//  dict childTree subdomain
+        NEWDICT	//  dict childTree subdomain value
+      }>ELSE<{	//  dict cat subdomain childTree value
+        s1 s3 XCHG
+        16 PUSHINT	//  dict childTree subdomain cat value _25=16
+        DICTIDEL	//  dict childTree subdomain _42 _43
+        DROP	//  dict childTree subdomain value
+      }>
+    }>ELSE<{	//  dict cat subdomain childTree value s
+      s0 s4 XCHG2	//  dict value subdomain childTree s cat
+      removeSubdomain CALLDICT	//  dict value subdomain childTree
+      s0 s2 XCHG	//  dict childTree subdomain value
+    }>
+    8 PUSHPOW2	//  dict childTree subdomain value _28=256
+    NEWC	//  dict childTree subdomain value _28=256 _29
+    s1 s2 XCHG	//  dict childTree subdomain _28=256 value _29
+    STDICT	//  dict childTree subdomain _28=256 _30
+    s1 s3 XCHG	//  dict _28=256 subdomain childTree _30
+    STDICT	//  dict _28=256 subdomain _31
+    ENDC	//  dict _28=256 subdomain _32
+    setDictUValue CALLDICT	//  _33
+  }>
+  removeRecord PROC:<{
+    //  s cat
+    OVER	//  s cat s
+    SEMPTY	//  s cat _3
+    32 THROWIF
+    c4 PUSH	//  s cat _6
+    CTOS	//  s cat cs
+    256 LDU	//  s cat owner cs
+    LDDICT	//  s cat owner rootDict cs
+    ENDS
+    2SWAP	//  owner rootDict s cat
+    removeSubdomain CALLDICT	//  owner rootDict
+    NEWC	//  owner rootDict _17
+    s1 s2 XCHG	//  rootDict owner _17
+    256 STU	//  rootDict _19
+    STDICT	//  _20
+    ENDC	//  _21
+    c4 POP
+  }>
+  setOwner PROC:<{
+    //  public_key
+    c4 PUSH	//  public_key _2
+    CTOS	//  public_key cs
+    256 LDU	//  public_key _19 _18
+    NIP	//  public_key cs
+    LDDICT	//  public_key rootDict cs
+    ENDS	//  owner rootDict
+    NEWC	//  owner rootDict _12
+    s1 s2 XCHG	//  rootDict owner _12
+    256 STU	//  rootDict _14
+    STDICT	//  _15
+    ENDC	//  _16
+    c4 POP
+  }>
+  dnsresolve PROC:<{
+    //  s cat
+    OVER	//  s cat s
+    SEMPTY	//  s cat _3
+    32 THROWIF
+    OVER	//  s cat s
+    slice_bytes CALLDICT	//  s cat oridinalLength
+    s0 s2 XCHG	//  oridinalLength cat s
+    getRootDomainStore CALLDICT	//  oridinalLength cat store s f
+    IFNOTJMP:<{	//  oridinalLength cat store s
+      4 BLKDROP	// 
+      0 PUSHINT	//  _10=0
+      NULL	//  _10=0 _11
+    }>	//  oridinalLength cat store s
+    SWAP	//  oridinalLength cat s store
+    LDDICT	//  oridinalLength cat s value store
+    s0 s2 XCHG	//  oridinalLength cat store value s
+    hasAdditionalDomain CALLDICT	//  oridinalLength cat store value addtionalDomain s
+    SWAP	//  oridinalLength cat store value s addtionalDomain
+    0 EQINT	//  oridinalLength cat store value s _18
+    IFJMP:<{	//  oridinalLength cat store value s
+      DROP
+      NIP	//  oridinalLength cat value
+      OVER	//  oridinalLength cat value cat
+      0 EQINT	//  oridinalLength cat value _20
+      IFJMP:<{	//  oridinalLength cat value
+        NIP	//  oridinalLength value
+        CTOS	//  oridinalLength _21
+      }>	//  oridinalLength cat value
+      16 PUSHINT	//  oridinalLength cat value _23=16
+      DICTIGETOPTREF	//  oridinalLength dnsRecord
+      DUP	//  oridinalLength dnsRecord dnsRecord
+      ISNULL	//  oridinalLength dnsRecord _25
+      IFJMP:<{	//  oridinalLength dnsRecord
+        2DROP	// 
+        0 PUSHINT	//  _26=0
+        NULL	//  _26=0 _27
+      }>	//  oridinalLength dnsRecord
+      CTOS	//  oridinalLength _28
+    }>	//  oridinalLength cat store value s
+    s0 s2 XCHG	//  oridinalLength cat s value store
+    LDDICT	//  oridinalLength cat s value _62 _61
+    DROP	//  oridinalLength cat s value childTree
+    s0 s2 s3 XCPUXC	//  oridinalLength value s childTree s cat
+    resolveSubdomain CALLDICT	//  oridinalLength value s _63 _64 _65
+    DROP	//  oridinalLength value s resultDns res
+    -1 EQINT	//  oridinalLength value s resultDns _39
+    IF:<{	//  oridinalLength value s resultDns
+      -1 PUSHINT	//  oridinalLength value s resultDns _41=-1
+      s0 s3 XCHG2
+      16 PUSHINT	//  oridinalLength resultDns s _41=-1 value _42=16
+      DICTIGETOPTREF	//  oridinalLength resultDns s dnsResolver
+      DUP	//  oridinalLength resultDns s dnsResolver dnsResolver
+      ISNULL	//  oridinalLength resultDns s dnsResolver _44
+      IF:<{	//  oridinalLength resultDns s dnsResolver
+        DROP	//  oridinalLength resultDns s
+      }>ELSE<{	//  oridinalLength resultDns s dnsResolver
+        s2 POP	//  oridinalLength resultDns s
+      }>
+    }>ELSE<{
+      s2 POP	//  oridinalLength resultDns s
+    }>
+    NULL	//  oridinalLength resultDns s resultDnsS
+    s2 PUSH	//  oridinalLength resultDns s resultDnsS resultDns
+    ISNULL	//  oridinalLength resultDns s resultDnsS _48
+    IFNOT:<{	//  oridinalLength resultDns s resultDnsS
+      DROP	//  oridinalLength resultDns s
+      SWAP	//  oridinalLength s resultDns
+      CTOS	//  oridinalLength s resultDnsS
+    }>ELSE<{
+      ROT
+      DROP	//  oridinalLength s resultDnsS
+    }>
+    SWAP	//  oridinalLength resultDnsS s
+    slice_bytes CALLDICT	//  oridinalLength resultDnsS remainingBytes
+    s1 s2 XCHG	//  resultDnsS oridinalLength remainingBytes
+    SUB	//  resultDnsS resolved_bytes
+    SWAP	//  resolved_bytes resultDnsS
+  }>
+  getOwner PROC:<{
+    // 
+    c4 PUSH	//  _1
+    CTOS	//  cs
+    256 LDU	//  _7 _6
+    DROP	//  _3
+  }>
+  recv_internal PROC:<{
+    //  in_msg_cell in_msg
+    2DROP	// 
+  }>
+  recv_external PROC:<{
+    //  in_msg
+    DUP	//  in_msg in_msg
+    SEMPTY	//  in_msg _2
+    34 THROWIF
+    getOwner CALLDICT	//  in_msg owner
+    SWAP
+    9 PUSHPOW2	//  owner in_msg _8=512
+    LDSLICEX	//  owner signature in_msg
+    DUP	//  owner signature in_msg in_msg
+    HASHSU	//  owner signature in_msg _11
+    s0 s0 s3 XCHG3	//  in_msg _11 signature owner
+    CHKSIGNU	//  in_msg _12
+    35 THROWIFNOT
+    32 LDU	//  op in_msg
+    OVER	//  op in_msg op
+    0 EQINT	//  op in_msg _19
+    IF:<{	//  op in_msg
+      NIP	//  in_msg
+      LDREF	//  subdomain in_msg
+      LDREF	//  subdomain dnsRecord in_msg
+      s2 PUSH	//  subdomain dnsRecord in_msg subdomain
+      ISNULL	//  subdomain dnsRecord in_msg _27
+      33 THROWIF
+      OVER	//  subdomain dnsRecord in_msg dnsRecord
+      ISNULL	//  subdomain dnsRecord in_msg _30
+      34 THROWIF
+      16 LDI	//  subdomain dnsRecord _68 _67
+      DROP	//  subdomain dnsRecord cat
+      s0 s2 XCHG	//  cat dnsRecord subdomain
+      CTOS	//  cat dnsRecord _36
+      s0 s2 XCHG	//  _36 dnsRecord cat
+      setRecord CALLDICT
+    }>ELSE<{	//  op in_msg
+      OVER	//  op in_msg op
+      1 EQINT	//  op in_msg _39
+      IF:<{	//  op in_msg
+        NIP	//  in_msg
+        256 LDU	//  _70 _69
+        DROP	//  new_public_key
+        setOwner CALLDICT
+      }>ELSE<{	//  op in_msg
+        SWAP	//  in_msg op
+        2 EQINT	//  in_msg _46
+        IF:<{	//  in_msg
+          LDREF	//  subdomain in_msg
+          OVER	//  subdomain in_msg subdomain
+          ISNULL	//  subdomain in_msg _51
+          33 THROWIF
+          16 LDI	//  subdomain _74 _73
+          DROP	//  subdomain cat
+          SWAP	//  cat subdomain
+          CTOS	//  cat _57
+          SWAP	//  _57 cat
+          removeRecord CALLDICT
+        }>ELSE<{
+          DROP	// 
+        }>
+      }>
+    }>
+  }>
+}END>c

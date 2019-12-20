@@ -1,0 +1,32 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+{ ."usage: " @' $0 type ." <filename-base> <contract-addr> <count> <seqno>" cr
+    ."<count>     - number of tickets to refund" cr
+    ."<seqno>     - customer_seqno" cr
+    ."Sets number of tickets available for sale." cr
+} : usage
+// 2- -2 and '
+$# 3 - 0< { usage bye } if
+
+false constant bounce
+
+$1 =: file-base
+$2 parse-int =: count
+$3 parse-int =: seqno
+
+file-base +".pk" load-keypair nip constant customer_pk
+
+60 constant timeout // timeout 60s
+
+now timeout + 32 << 1- dup =: query_id
+
+<b 2 3 u, query_id 64 u, seqno 16 u, customer_pk priv>pub B, count 8 u, b> constant msg
+
+dup ."signing message: " msg <s csr. cr
+msg hashu customer_pk ed25519_sign_uint constant signing_bin
+
+<b msg ref, <b signing_bin B, b> ref, b> 0 boc+>B
+."Refunding tickets for" customer_pk priv>pub 256 B>i@ . 
+"bodies/refund-tickets-body.boc" tuck B>file
+."(Saved refund tickets body to file " type .")" cr

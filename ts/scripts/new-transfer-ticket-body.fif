@@ -1,0 +1,36 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+{ ."usage: " @' $0 type ." <filename-base> <filename-base2> <contract-addr> <count> <seqno>" cr
+    ."<filename-base>     - owner of tickets" cr
+    ."<filename-base2>     - new owner of tickets" cr
+    ."<count>     - number of tickets to transfer" cr
+    ."<seqno>     - customer_seqno" cr
+    ."Sets number of tickets available for sale." cr
+} : usage
+// 2- -2 and '
+$# 4 - 0< { usage bye } if
+
+false constant bounce
+
+$1 =: file-base
+$2 =: file-base2
+$3 parse-int =: count
+$4 parse-int =: seqno
+
+file-base +".pk" load-keypair nip constant customer_pk
+file-base2 +".pk" load-keypair nip constant newOwner_pk
+
+60 constant timeout // timeout 60s
+
+now timeout + 32 << 1- dup =: query_id
+
+<b 3 3 u, query_id 64 u, seqno 16 u, customer_pk priv>pub B, newOwner_pk priv>pub B, count 8 u, b> constant msg
+
+dup ."signing message: " msg <s csr. cr
+msg hashu customer_pk ed25519_sign_uint constant signing_bin
+
+<b msg ref, <b signing_bin B, b> ref, b> 0 boc+>B
+."Transfering " count . ."ticket/s from " customer_pk priv>pub 256 B>u@ . ."to " newOwner_pk priv>pub 256 B>u@ . 
+"bodies/transfer-tickets-body.boc" tuck B>file
+."(Saved transfer tickets body to file " type .")" cr

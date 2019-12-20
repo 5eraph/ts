@@ -1,0 +1,106 @@
+// automatically generated from `./stdlib.fc` `./ttt.fc` 
+PROGRAM{
+  DECLPROC recv_external
+  DECLPROC test
+  DECLPROC test2
+  DECLPROC testDict
+  DECLPROC recv_internal
+  recv_external PROC:<{
+    //  in_msg
+    NEWC	//  in_msg _2
+    SWAP	//  _2 in_msg
+    STSLICER	//  _3
+    ENDC	//  tc
+    HASHCU	//  _5
+  }>
+  test PROC:<{
+    //  s
+    B{} swap | swap { dup sbits } { 1 B@+ swap dup dup Blen 8 * B>i@ 0 = { 3 roll dup Blen 0> { Bhash 3 roll swap , swap drop B{} swap rot } { 3 -roll drop } cond } { 3 roll swap B+ -rot } cond } while rot 2drop dup count	//  _3 _2
+    SWAP	//  _2 _3
+  }>
+  test2 PROC:<{
+    //  s
+    B{} swap 0 { dup 0= rot dup sbits rot and } { 1 B@+ swap dup dup Blen 8 * B>i@ 0 = { 3 roll dup Blen 0> { Bhash 3 roll drop swap drop B{} -rot } { 3 -roll drop swap } cond } { 3 roll swap B+ -rot swap } cond } while rot drop	//  _3 _2
+    SWAP	//  _2 _3
+  }>
+  testDict PROC:<{
+    //  s
+    NEWDICT	//  s sdict
+    NEWC	//  s sdict _4
+    s2 PUSH	//  s sdict _4 s
+    STSLICER	//  s sdict _5
+    s2 PUSH	//  s sdict _5 s
+    STSLICER	//  s sdict _6
+    1 PUSHINT	//  s sdict _6 _7=1
+    ROT
+    8 PUSHPOW2	//  s _6 _7=1 sdict _8=256
+    DICTISETB	//  s sdict
+    NEWC	//  s sdict _11
+    s2 PUSH	//  s sdict _11 s
+    STSLICER	//  s sdict _12
+    s2 PUSH	//  s sdict _12 s
+    STSLICER	//  s sdict _13
+    2 PUSHINT	//  s sdict _13 _14=2
+    ROT
+    8 PUSHPOW2	//  s _13 _14=2 sdict _15=256
+    DICTISETB	//  s sdict
+    NEWC	//  s sdict _18
+    s2 PUSH	//  s sdict _18 s
+    STSLICER	//  s sdict _19
+    s2 PUSH	//  s sdict _19 s
+    STSLICER	//  s sdict _20
+    3 PUSHINT	//  s sdict _20 _21=3
+    ROT
+    8 PUSHPOW2	//  s _20 _21=3 sdict _22=256
+    DICTISETB	//  s sdict
+    NEWC	//  s sdict _25
+    s2 PUSH	//  s sdict _25 s
+    STSLICER	//  s sdict _26
+    ROT	//  sdict _26 s
+    STSLICER	//  sdict _27
+    4 PUSHINT	//  sdict _27 _28=4
+    ROT
+    8 PUSHPOW2	//  _27 _28=4 sdict _29=256
+    DICTISETB	//  sdict
+  }>
+  recv_internal PROC:<{
+    //  msg_value in_msg_cell in_msg cat
+    DROP
+    s2 POP	//  in_msg in_msg_cell
+    CTOS	//  in_msg cs
+    4 LDU	//  in_msg flags cs
+    SWAP
+    1 PUSHINT	//  in_msg cs flags _10=1
+    AND	//  in_msg cs _11
+    IFJMP:<{	//  in_msg cs
+      2DROP	// 
+      0 PUSHINT	//  _12=0
+      PUSHNULL	//  _12=0 _13
+    }>	//  in_msg cs
+    32 LDU	//  in_msg _33 _32
+    DROP	//  in_msg op
+    DUP	//  in_msg op op
+    0 EQINT	//  in_msg op _19
+    IF:<{	//  in_msg op
+      DROP	//  in_msg
+      SEMPTY	//  _20
+      IFJMP:<{	// 
+        0 PUSHINT	//  _21=0
+        PUSHNULL	//  _21=0 _22
+      }>	// 
+    }>ELSE<{	//  in_msg op
+      1 EQINT	//  in_msg _24
+      IF:<{	//  in_msg
+        SEMPTY	//  _25
+        IFJMP:<{	// 
+          0 PUSHINT	//  _26=0
+          PUSHNULL	//  _26=0 _27
+        }>	// 
+      }>ELSE<{
+        DROP	// 
+      }>
+    }>
+    0 PUSHINT	//  _28=0
+    PUSHNULL	//  _28=0 _29
+  }>
+}END>c

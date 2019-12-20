@@ -1,0 +1,83 @@
+"Asm.fif" include
+
+x{aabbcc00aabbcc}
+
+PROGRAM{
+  DECLPROC slice_bytes
+  DECLPROC builder_bytes
+  DECLPROC main
+  slice_bytes PROC:<{
+    //  s
+    SBITS	//  _1
+    3 RSHIFT#	//  _3
+  }>
+  builder_bytes PROC:<{
+    //  b
+    BBITS	//  _1
+    3 RSHIFT#	//  _3
+  }>
+
+  main PROC:<{
+    //  s
+    NEWC	//  s subdomainB
+    0 PUSHINT	//  s subdomainB hash=0
+    WHILE:<{
+      DUP	//  s subdomainB hash hash
+      0 EQINT	//  s subdomainB hash _6
+      s3 PUSH	//  s subdomainB hash _6 s
+      slice_bytes CALLDICT	//  s subdomainB hash _6 _7
+      0 GTINT	//  s subdomainB hash _6 _9
+      AND	//  s subdomainB hash _10
+    }>DO<{	//  s subdomainB hash
+      s0 s2 XCHG	//  hash subdomainB s
+      8 LDSLICE	//  hash subdomainB byte s
+      OVER	//  hash subdomainB byte s byte
+      8 PLDI	//  hash subdomainB byte s value
+      0 EQINT	//  hash subdomainB byte s _18
+      IF:<{	//  hash subdomainB byte s
+        NIP	//  hash subdomainB s
+        OVER	//  hash subdomainB s subdomainB
+        BBITS	//  hash subdomainB s _19
+        0 GTINT	//  hash subdomainB s _21
+        IF:<{	//  hash subdomainB s
+          s2 POP	//  s subdomainB
+          DUP	//  s subdomainB subdomainB
+          ENDC	//  s subdomainB subdomain
+          HASHCU	//  s subdomainB hash
+        }>ELSE<{
+          s0 s2 XCHG	//  s subdomainB hash
+        }>
+      }>ELSE<{	//  hash subdomainB byte s
+        -ROT	//  hash s subdomainB byte
+        STSLICER	//  hash s subdomainB
+        ROT	//  s subdomainB hash
+      }>
+    }>	//  s subdomainB hash
+    DUP	//  s subdomainB hash hash
+    0 EQINT	//  s subdomainB hash _27
+    IFNOTJMP:<{	//  s subdomainB hash
+      NIP	//  s hash
+      SWAP	//  hash s
+    }>	//  s subdomainB hash
+    DROP	//  s subdomainB
+    DUP	//  s subdomainB subdomainB
+    builder_bytes CALLDICT	//  s subdomainB remainingBytes
+    0 GTINT	//  s subdomainB _31
+    IFJMP:<{	//  s subdomainB
+      ENDC	//  s subdomain
+      HASHCU	//  s hash
+      SWAP	//  hash s
+    }>	//  s subdomainB
+    DROP	//  s
+    0 PUSHINT	//  s _36=0
+    SWAP	//  _36=0 s
+  }>
+}END>s =: code
+
+// dup csr.
+
+code
+runvmdict .s
+drop
+code
+runvmdict .s

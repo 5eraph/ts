@@ -1,0 +1,912 @@
+// automatically generated from `stdlib.fc` `ts/ts.fc` 
+PROGRAM{
+  DECLPROC loadData
+  DECLPROC saveData
+  DECLPROC pack_uint
+  DECLPROC unpack_uint
+  DECLPROC pack_record
+  DECLPROC unpack_record
+  DECLPROC pack_addr
+  DECLPROC unpack_addr
+  DECLPROC refundValue
+  DECLPROC buy_ticket
+  DECLPROC refund_ticket
+  DECLPROC transfer_ticket
+  DECLPROC send_message
+  78320 DECLMETHOD proof_ownership
+  90275 DECLMETHOD owned_tickets
+  126078 DECLMETHOD available_tickets
+  116154 DECLMETHOD refunds_accepted
+  96097 DECLMETHOD refunds_ends
+  77232 DECLMETHOD sale_ends
+  105740 DECLMETHOD refund_percentage
+  80293 DECLMETHOD get_owner
+  108963 DECLMETHOD get_price
+  85143 DECLMETHOD seqno
+  70367 DECLMETHOD customer_seqno
+  72028 DECLMETHOD event_info
+  DECLPROC recv_internal
+  DECLPROC recv_external
+  loadData PROC:<{
+    c4 PUSH
+    CTOS
+    256 LDU
+    16 LDU
+    LDGRAMS
+    32 LDU
+    32 LDU
+    7 LDU
+    LDDICT
+    LDREF
+    DROP
+  }>
+  saveData PROC:<{
+    NEWC
+    s1 s8 XCHG
+    256 STU
+    s1 s6 XCHG
+    16 STU
+    s0 s4 XCHG2
+    STGRAMS
+    s1 s2 XCHG
+    32 STU
+    32 STU
+    7 STU
+    STDICT
+    STREF
+    ENDC
+    c4 POP
+  }>
+  pack_uint PROC:<{
+    NEWC
+    SWAP
+    STUX
+    ENDC
+  }>
+  unpack_uint PROC:<{
+    SWAP
+    CTOS
+    SWAP
+    PLDUX
+  }>
+  pack_record PROC:<{
+    NEWC
+    s1 s2 XCHG
+    8 STU
+    16 STU
+    ENDC
+  }>
+  unpack_record PROC:<{
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      0 PUSHINT
+      DUP
+    }>
+    CTOS
+    8 LDU
+    16 LDU
+    DROP
+  }>
+  pack_addr PROC:<{
+    NEWC
+    SWAP
+    STSLICER
+    ENDC
+  }>
+  unpack_addr PROC:<{
+    DROP
+    CTOS
+    LDMSGADDR
+    DROP
+  }>
+  refundValue PROC:<{
+    DUP
+    100 LESSINT
+    IFJMP:<{
+      SWAP
+      100 PUSHINT
+      DIV
+      SWAP
+      MUL
+    }>
+    DROP
+  }>
+  buy_ticket PROC:<{
+    s2 PUSH
+    0 EQINT
+    IFJMP:<{
+      s1 s3 XCHG
+      3 BLKDROP
+      6 PUSHINT
+      SWAP
+    }>
+    s0 s3 PUXC
+    MUL
+    SUB
+    DUP
+    0 LESSINT
+    IFJMP:<{
+      3 BLKDROP
+      1 PUSHINT
+      0 PUSHINT
+    }>
+    0 PUSHINT
+    s4 PUSH
+    8 PUSHPOW2
+    DICTUGETOPTREF
+    0 PUSHINT
+    OVER
+    ISNULL
+    IFNOT:<{
+      DROP
+      24 PUSHINT
+      unpack_uint CALLDICT
+    }>ELSE<{
+      NIP
+    }>
+    s0 s3 PUSH2
+    GEQ
+    IFNOTJMP:<{
+      4 BLKDROP
+      2 PUSHINT
+      0 PUSHINT
+    }>
+    s2 s4 PUSH2
+    8 PUSHPOW2
+    DICTUGETOPTREF
+    0 PUSHINT
+    s0 s1 PUSH2
+    ISNULL
+    IFNOT:<{
+      2DROP
+      unpack_record CALLDICT
+    }>ELSE<{
+      ROT
+      DROP
+    }>
+    s1 s5 XCPU
+    ADD
+    DUP
+    8 PUSHPOW2DEC
+    SUB
+    0 GTINT
+    IFJMP:<{
+      6 BLKDROP
+      3 PUSHINT
+      0 PUSHINT
+    }>
+    s2 s5 XCHG2
+    SUB
+    24 PUSHINT
+    pack_uint CALLDICT
+    0 PUSHINT
+    s1 s0 s6 XCHG3
+    8 PUSHPOW2
+    DICTUSETREF
+    s3 s4 XCHG2
+    pack_record CALLDICT
+    s0 s1 s3 XCHG3
+    8 PUSHPOW2
+    DICTUSETREF
+    SWAP
+    0 PUSHINT
+    SWAP
+  }>
+  refund_ticket PROC:<{
+    NIP
+    OVER
+    0 EQINT
+    IFJMP:<{
+      5 BLKDROP
+      6 PUSHINT
+      0 PUSHINT
+    }>
+    s1 s5 PUSH2
+    8 PUSHPOW2
+    DICTUGETOPTREF
+    DUP
+    ISNULL
+    IFJMP:<{
+      6 BLKDROP
+      4 PUSHINT
+      0 PUSHINT
+    }>
+    unpack_record CALLDICT
+    s0 s6 PUXC
+    EQUAL
+    IFNOTJMP:<{
+      6 BLKDROP
+      7 PUSHINT
+      0 PUSHINT
+    }>
+    OVER
+    SUB
+    DUP
+    0 LESSINT
+    IFJMP:<{
+      6 BLKDROP
+      4 PUSHINT
+      0 PUSHINT
+    }>
+    0 PUSHINT
+    s7 PUSH
+    8 PUSHPOW2
+    DICTUGETOPTREF
+    0 PUSHINT
+    OVER
+    ISNULL
+    IFNOT:<{
+      DROP
+      24 PUSHINT
+      unpack_uint CALLDICT
+    }>ELSE<{
+      NIP
+    }>
+    s2 PUSH
+    ADD
+    OVER
+    0 EQINT
+    IF:<{
+      NIP
+      s5 POP
+      s0 s5 XCHG
+      8 PUSHPOW2
+      DICTUDEL
+      DROP
+    }>ELSE<{
+      s0 s6 XCHG
+      INC
+      pack_record CALLDICT
+      s0 s0 s6 XCHG3
+      8 PUSHPOW2
+      DICTUSETREF
+    }>
+    s0 s3 XCHG
+    24 PUSHINT
+    pack_uint CALLDICT
+    0 PUSHINT
+    s1 s0 s4 XCHG3
+    8 PUSHPOW2
+    DICTUSETREF
+    -ROT
+    refundValue CALLDICT
+    s1 s2 XCHG
+    MUL
+    0 PUSHINT
+    SWAP
+  }>
+  transfer_ticket PROC:<{
+    s2 PUSH
+    0 EQINT
+    s2 PUSH
+    0 EQINT
+    OR
+    IFJMP:<{
+      4 BLKDROP
+      6 PUSHINT
+    }>
+    s2 s4 PUSH2
+    8 PUSHPOW2
+    DICTUGETOPTREF
+    DUP
+    ISNULL
+    IFJMP:<{
+      5 BLKDROP
+      4 PUSHINT
+    }>
+    unpack_record CALLDICT
+    s0 s5 PUXC
+    EQUAL
+    IFNOTJMP:<{
+      5 BLKDROP
+      7 PUSHINT
+    }>
+    OVER
+    SUB
+    DUP
+    0 LESSINT
+    IFJMP:<{
+      5 BLKDROP
+      4 PUSHINT
+    }>
+    s2 s5 PUSH2
+    8 PUSHPOW2
+    DICTUGETOPTREF
+    0 PUSHINT
+    s0 s1 PUSH2
+    ISNULL
+    IFNOT:<{
+      2DROP
+      unpack_record CALLDICT
+    }>ELSE<{
+      ROT
+      DROP
+    }>
+    s0 s3 XCHG
+    ADD
+    DUP
+    8 PUSHPOW2DEC
+    SUB
+    0 GTINT
+    IFJMP:<{
+      6 BLKDROP
+      3 PUSHINT
+    }>
+    OVER
+    0 EQINT
+    IF:<{
+      NIP
+      s4 POP
+      s2 s4 XCHG2
+      8 PUSHPOW2
+      DICTUDEL
+      DROP
+    }>ELSE<{
+      s0 s5 XCHG
+      INC
+      pack_record CALLDICT
+      s0 s3 s5 XCHG3
+      8 PUSHPOW2
+      DICTUSETREF
+      s1 s3 XCHG
+    }>
+    s2 s3 XCHG2
+    pack_record CALLDICT
+    s0 s2 XCHG
+    8 PUSHPOW2
+    DICTUSETREF
+    0 PUSHINT
+  }>
+  send_message PROC:<{
+    OVER
+    0 LESSINT
+    IF:<{
+      NIP
+      0 PUSHINT
+    }>ELSE<{
+      SWAP
+    }>
+    0 PUSHINT
+    24 PUSHINT
+    NEWC
+    6 STU
+    s0 s7 XCHG2
+    STSLICER
+    SWAP
+    STGRAMS
+    s1 s5 XCHG
+    107 STU
+    s1 s3 XCHG
+    4 STU
+    64 STU
+    OVER
+    -1 GTINT
+    IF:<{
+      32 STU
+    }>ELSE<{
+      NIP
+    }>
+    ENDC
+    SWAP
+    SENDRAWMSG
+  }>
+  proof_ownership PROC:<{
+    CTOS
+    SWAP
+    HASHCU
+    s0 s2 XCHG
+    CHKSIGNU
+  }>
+  owned_tickets PROC:<{
+    loadData CALLDICT
+    s1 s7 XCHG
+    7 BLKDROP
+    8 PUSHPOW2
+    DICTUGETOPTREF
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      0 PUSHINT
+    }>
+    unpack_record CALLDICT
+    DROP
+  }>
+  available_tickets PROC:<{
+    loadData CALLDICT
+    s1 s7 XCHG
+    7 BLKDROP
+    0 PUSHINT
+    SWAP
+    8 PUSHPOW2
+    DICTUGETOPTREF
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      0 PUSHINT
+    }>
+    24 PUSHINT
+    unpack_uint CALLDICT
+  }>
+  refunds_accepted PROC:<{
+    loadData CALLDICT
+    3 BLKDROP
+    s2 POP
+    s2 POP
+    s2 POP
+    NOW
+    s0 s1 PUXC
+    LESS
+    s0 s2 XCHG
+    LESS
+    AND
+  }>
+  refunds_ends PROC:<{
+    loadData CALLDICT
+    3 BLKDROP
+    s2 POP
+    s2 POP
+    s2 POP
+    s0 s1 PUSH2
+    SUB
+    0 GTINT
+    IFJMP:<{
+      DROP
+    }>
+    NIP
+  }>
+  sale_ends PROC:<{
+    loadData CALLDICT
+    s4 s7 XCHG
+    7 BLKDROP
+  }>
+  refund_percentage PROC:<{
+    loadData CALLDICT
+    2DROP
+    s3 POP
+    s3 POP
+    s3 POP
+    NOW
+    s0 s3 PUXC
+    LESS
+    2SWAP
+    LESS
+    AND
+    IFJMP:<{
+      DUP
+      100 GTINT
+      IFJMP:<{
+        DROP
+        100 PUSHINT
+      }>
+    }>
+    DROP
+    0 PUSHINT
+  }>
+  get_owner PROC:<{
+    loadData CALLDICT
+    7 BLKDROP
+  }>
+  get_price PROC:<{
+    loadData CALLDICT
+    s5 s7 XCHG
+    7 BLKDROP
+  }>
+  seqno PROC:<{
+    loadData CALLDICT
+    s6 s7 XCHG
+    7 BLKDROP
+  }>
+  customer_seqno PROC:<{
+    loadData CALLDICT
+    s1 s7 XCHG
+    7 BLKDROP
+    8 PUSHPOW2
+    DICTUGETOPTREF
+    DUP
+    ISNULL
+    IFJMP:<{
+      DROP
+      0 PUSHINT
+    }>
+    unpack_record CALLDICT
+    NIP
+  }>
+  event_info PROC:<{
+    loadData CALLDICT
+    s0 s7 XCHG
+    7 BLKDROP
+  }>
+  recv_internal PROC:<{
+    DUP
+    SREFS
+    0 EQINT
+    IFJMP:<{
+      3 BLKDROP
+    }>
+    SWAP
+    CTOS
+    4 LDU
+    SWAP
+    1 PUSHINT
+    AND
+    IFJMP:<{
+      3 BLKDROP
+    }>
+    SWAP
+    LDREF
+    OVER
+    ISNULL
+    IFJMP:<{
+      4 BLKDROP
+    }>
+    OVER
+    CTOS
+    3 LDU
+    OVER
+    0 EQINT
+    IFJMP:<{
+      6 BLKDROP
+    }>
+    s0 s5 XCHG
+    1000000000 PUSHINT
+    SUB
+    DUP
+    0 LESSINT
+    IFJMP:<{
+      6 BLKDROP
+    }>
+    s0 s4 XCHG
+    LDMSGADDR
+    DROP
+    s0 s5 XCHG
+    64 LDU
+    s2 PUSH
+    4 GTINT
+    IFJMP:<{
+      DROP
+      s2 POP
+      s2 POP
+      15 PUSHINT
+      s2 s3 XCHG2
+      0 PUSHINT
+      send_message CALLDICT
+    }>
+    loadData CALLDICT
+    s10 PUSH
+    1 EQINT
+    s11 PUSH
+    4 EQINT
+    OR
+    IFJMP:<{
+      s11 POP
+      s11 POP
+      s2 PUSH
+      NOW
+      LESS
+      IFJMP:<{
+        7 BLKDROP
+        s2 POP
+        s2 POP
+        s2 POP
+        5 PUSHINT
+        0 PUSHINT
+        s3 s3 s0 XCHG3
+        64 PUSHINT
+        send_message CALLDICT
+      }>
+      s0 s6 XCHG
+      256 LDU
+      8 LDU
+      DROP
+      s3 s11 XCHG
+      s4 PUSH
+      s13 s3 XCHG2
+      s0 s13 XCHG
+      buy_ticket CALLDICT
+      s8 PUSH
+      4 EQINT
+      s2 PUSH
+      0 EQINT
+      AND
+      IF:<{
+        DROP
+        1000000000 PUSHINT
+        s4 s12 XCHG
+        s7 s3 s0 XCHG3
+        s1 s8 XCHG
+        0 PUSHINT
+        send_message CALLDICT
+      }>ELSE<{
+        OVER
+        0 EQINT
+        IF:<{
+          1000000000 PUSHINT
+          ADD
+          s4 s12 XCHG
+          s7 s3 s0 XCHG3
+          s1 s8 XCHG
+          0 PUSHINT
+          send_message CALLDICT
+        }>ELSE<{
+          DROP
+          0 PUSHINT
+          s4 s12 XCHG
+          s7 s3 s0 XCHG3
+          s1 s8 XCHG
+          64 PUSHINT
+          send_message CALLDICT
+        }>
+      }>
+      s0 s7 XCHG
+      s0 s6 XCHG
+      s3 s5 XCHG
+      s3 s4 XCHG
+      s2 s3 XCHG2
+      saveData CALLDICT
+    }>
+    s10 PUSH
+    2 EQINT
+    IFJMP:<{
+      refunds_accepted CALLDICT
+      IFNOTJMP:<{
+        9 BLKDROP
+        s2 POP
+        s2 POP
+        s2 POP
+        2 PUSHINT
+        0 PUSHINT
+        s3 s3 s0 XCHG3
+        64 PUSHINT
+        send_message CALLDICT
+      }>
+      s0 s8 XCHG
+      16 LDU
+      256 LDU
+      8 LDU
+      DROP
+      s0 s13 XCHG
+      LDREF
+      DROP
+      DUP
+      ISNULL
+      IFJMP:<{
+        11 BLKDROP
+        s2 POP
+        s2 POP
+        s2 POP
+        14 PUSHINT
+        0 PUSHINT
+        s3 s3 s0 XCHG3
+        64 PUSHINT
+        send_message CALLDICT
+      }>
+      CTOS
+      9 PUSHPOW2
+      LDSLICEX
+      DROP
+      s0 s14 XCHG
+      HASHCU
+      s0 s14 s14 XC2PU
+      CHKSIGNU
+      IFNOTJMP:<{
+        9 BLKDROP
+        s2 POP
+        s2 POP
+        s2 POP
+        14 PUSHINT
+        0 PUSHINT
+        s3 s3 s0 XCHG3
+        64 PUSHINT
+        send_message CALLDICT
+      }>
+      s4 s3 s2 XC2PU
+      s6 PUSH
+      s14 s15 s3 XCHG3
+      s0 s13 XCHG
+      refund_ticket CALLDICT
+      s4 s12 XCHG
+      s7 s3 s0 XCHG3
+      s1 s8 XCHG
+      64 PUSHINT
+      send_message CALLDICT
+      s0 s7 XCHG
+      s0 s6 XCHG
+      s3 s5 XCHG
+      -ROT
+      saveData CALLDICT
+    }>
+    s13 POP
+    s3 PUSH
+    NOW
+    LESS
+    IFJMP:<{
+      8 BLKDROP
+      s2 POP
+      s2 POP
+      s2 POP
+      5 PUSHINT
+      0 PUSHINT
+      s3 s3 s0 XCHG3
+      64 PUSHINT
+      send_message CALLDICT
+    }>
+    s0 s7 XCHG
+    16 LDU
+    256 LDU
+    256 LDU
+    8 LDU
+    DROP
+    s0 s13 XCHG
+    LDREF
+    DROP
+    DUP
+    ISNULL
+    IFJMP:<{
+      11 BLKDROP
+      s2 POP
+      s2 POP
+      s2 POP
+      14 PUSHINT
+      0 PUSHINT
+      s3 s3 s0 XCHG3
+      64 PUSHINT
+      send_message CALLDICT
+    }>
+    CTOS
+    9 PUSHPOW2
+    LDSLICEX
+    DROP
+    s0 s14 XCHG
+    HASHCU
+    s0 s14 s2 XC2PU
+    CHKSIGNU
+    IFNOTJMP:<{
+      9 BLKDROP
+      s2 POP
+      s2 POP
+      s2 POP
+      13 PUSHINT
+      0 PUSHINT
+      s3 s3 s0 XCHG3
+      64 PUSHINT
+      send_message CALLDICT
+    }>
+    s4 s8 XCHG
+    2SWAP
+    s12 s11 XCHG2
+    transfer_ticket CALLDICT
+    0 PUSHINT
+    s4 s12 XCHG
+    s7 s3 s0 XCHG3
+    s1 s8 XCHG
+    64 PUSHINT
+    send_message CALLDICT
+    s0 s7 XCHG
+    s0 s6 XCHG
+    s3 s5 XCHG
+    s4 s4 s0 XCHG3
+    saveData CALLDICT
+  }>
+  recv_external PROC:<{
+    DUP
+    SEMPTY
+    34 THROWIF
+    9 PUSHPOW2
+    LDSLICEX
+    loadData CALLDICT
+    s8 PUSH
+    HASHSU
+    s0 s10 s8 XC2PU
+    CHKSIGNU
+    35 THROWIFNOT
+    s0 s7 XCHG
+    64 LDU
+    NOW
+    32 LSHIFT#
+    s1 s2 XCHG
+    GREATER
+    35 THROWIFNOT
+    16 LDU
+    s6 s1 PUSH2
+    EQUAL
+    36 THROWIFNOT
+    3 LDU
+    OVER
+    6 LESSINT
+    37 THROWIFNOT
+    ACCEPT
+    OVER
+    0 EQINT
+    IFJMP:<{
+      3 BLKDROP
+      s0 s4 XCHG
+      INC
+      s5 s7 XCHG
+      s0 s6 XCHG
+      s3 s5 XCHG
+      s4 s0 s3 XCHG3
+      saveData CALLDICT
+    }>
+    OVER
+    1 EQINT
+    IF:<{
+      NIP
+      24 LDU
+      DROP
+      24 PUSHINT
+      pack_uint CALLDICT
+      0 PUSHINT
+      s1 s0 s9 XCHG3
+      8 PUSHPOW2
+      DICTUSETREF
+    }>ELSE<{
+      OVER
+      2 EQINT
+      IF:<{
+        NIP
+        s3 POP
+        s0 s2 XCHG
+        32 LDU
+        DROP
+      }>ELSE<{
+        OVER
+        3 EQINT
+        IF:<{
+          NIP
+          s2 POP
+          SWAP
+          7 LDU
+          DROP
+        }>ELSE<{
+          OVER
+          4 EQINT
+          IF:<{
+            NIP
+            WHILE:<{
+              DUP
+              SREFS
+            }>DO<{
+              8 LDU
+              LDREF
+              s0 s2 XCHG
+              SENDRAWMSG
+            }>
+            DROP
+          }>ELSE<{
+            SWAP
+            5 EQINT
+            IF:<{
+              s9 POP
+              s0 s8 XCHG
+              LDREF
+              DROP
+            }>ELSE<{
+              s1 s9 XCHG
+              DROP
+            }>
+            s0 s8 XCHG
+          }>
+          SWAP
+        }>
+        ROT
+      }>
+      s0 s1 s7 XCHG3
+    }>
+    s0 s7 XCHG
+    16 PUSHPOW2DEC
+    EQUAL
+    IF:<{
+    }>
+    s0 s4 XCHG
+    INC
+    s5 s7 XCHG
+    s0 s6 XCHG
+    s3 s5 XCHG
+    s4 s0 s3 XCHG3
+    saveData CALLDICT
+  }>
+}END>c

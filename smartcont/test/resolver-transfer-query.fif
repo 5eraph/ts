@@ -1,0 +1,42 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+{ ."usage: " @' $0 type ." <filename-base> <contract-addr> <pub-key>" cr
+  ."Transfers ownership of resolver to pub-key" cr
+} : usage
+// 2- -2 and '
+$# 3 - 0< { usage bye } if
+
+false constant bounce
+
+$1 =: file-base
+$2 false parse-load-address =: false 2=: contractAddr // kf-Cn1bSHIjalMGU3GUWWqxOfnNEQTV2h1Nq9hEBC08vG9Ln
+$3 parse-int =: pub_key
+
+file-base +".pk" load-keypair nip constant resolver_pk
+
+<b pub_key 256 u, b> constant pub_keyCell
+
+65536 constant timeout
+now timeout + 32 << 1- dup =: query_id
+
+<b query_id 64 u, 1 32 i, pub_keyCell ref, b> constant msg
+
+dup ."signing message: " msg <s csr. cr
+msg hashu resolver_pk ed25519_sign_uint constant signing_bin
+
+<b 
+    b{1000100} s, 
+    contractAddr addr, 
+    0 Gram, 
+    b{00} s,
+    signing_bin B, 
+    msg <s s, 
+b>
+
+dup ."External message for initialization is " <s csr. cr
+2 boc+>B // create bag of cells with crc32 embedded
+dup Bx. cr // prints bag of cells in hex
+
+file-base +"-tranfer-query.boc" tuck B>file // saves query
+."(Saved resolver creating query to file " type .")" cr

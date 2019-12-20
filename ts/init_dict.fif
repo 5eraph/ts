@@ -1,0 +1,22 @@
+// automatically generated from `stdlib.fc` `ts/init_dict.fc` 
+DECLPROC pack_uint
+DECLPROC main
+pack_uint PROC:<{
+  NEWC
+  SWAP
+  STUX
+  ENDC
+}>
+main PROC:<{
+  NEWDICT
+  SWAP
+  24 PUSHINT
+  NEWC
+  SWAP
+  STUX
+  ENDC
+  0 PUSHINT
+  ROT
+  8 PUSHPOW2
+  DICTUSETREF
+}>

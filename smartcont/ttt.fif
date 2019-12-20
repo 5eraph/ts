@@ -1,0 +1,236 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+def? $2 { @' $2 } { "new-wallet" } cond constant file-base
+$1 parse-workchain-id =: wc
+
+// body-cell wc =: temp2
+
+// "testt" $>s sbits .dump
+
+// x{ab73626a6f6a726b787663626c7872696e616775786576757068777363746a6e79736763776f776a77676b7769776d626d66777077747a6871736d7270786b6d797a756b726564647976697a75726f6a7a616b7762786b77706b686c68736375726978767a757a6e776c62676879756575727a73696c6b727861666b6a77}
+
+null
+.dump
+runvmcode
+
+x{aaaabbbbccccddddeeeeffff}
+1000
+dictnew 
+256
+idict!
+
+drop x{aaaabbbbccccddddeeeeffff} swap 2000 swap 256 idict!
+drop x{ccccddddeeeeffff} swap 3000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 4000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 5000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 6000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 7000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 8000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 9000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 10000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 11000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 12000 swap 256 idict!
+drop x{aaaabbbbccccddddeeeeffff} swap 13000 swap 256 idict!
+drop x{ab73626a6f6a726b787663626c7872696e616775786576757068777363746a6e79736763776f776a77676b7769776d626d66777077747a6871736d7270786b} swap 14000 swap 256 idict!
+drop x{ab73626a6f6a726b787663626c7872696e616775786576757068777363746a6e79736763776f776a77676b7769776d626d66777077747a6871736d7270786b} swap 15000 swap 256 idict!
+drop x{6d797a756b726564647976697a75726f6a7a616b7762786b77706b686c68736375726978767a757a6e776c62676879756575727a73696c6b727861666b6a77} swap 16000 swap 256 idict!
+drop
+cr
+
+dup 15000 swap 256 idict@ drop .s drop .s
+dup 16000 swap 256 idict@ drop .s drop .s
+cr
+
+."dict " .s
+cr
+
+// testDict PROC:<{
+//     //  s
+//     NEWDICT	//  s sdict
+//     NEWC	//  s sdict _4
+//     s2 PUSH	//  s sdict _4 s
+//     STSLICER	//  s sdict _5
+//     s2 PUSH	//  s sdict _5 s
+//     STSLICER	//  s sdict _6
+//     1 PUSHINT	//  s sdict _6 _7=1
+//     ROT
+//     8 PUSHPOW2	//  s _6 _7=1 sdict _8=256
+//     DICTISETB	//  s sdict
+//     NEWC	//  s sdict _11
+//     s2 PUSH	//  s sdict _11 s
+//     STSLICER	//  s sdict _12
+//     s2 PUSH	//  s sdict _12 s
+//     STSLICER	//  s sdict _13
+//     2 PUSHINT	//  s sdict _13 _14=2
+//     ROT
+//     8 PUSHPOW2	//  s _13 _14=2 sdict _15=256
+//     DICTISETB	//  s sdict
+//     NEWC	//  s sdict _18
+//     s2 PUSH	//  s sdict _18 s
+//     STSLICER	//  s sdict _19
+//     s2 PUSH	//  s sdict _19 s
+//     STSLICER	//  s sdict _20
+//     3 PUSHINT	//  s sdict _20 _21=3
+//     ROT
+//     8 PUSHPOW2	//  s _20 _21=3 sdict _22=256
+//     DICTISETB	//  s sdict
+//     NEWC	//  s sdict _25
+//     s2 PUSH	//  s sdict _25 s
+//     STSLICER	//  s sdict _26
+//     ROT	//  sdict _26 s
+//     STSLICER	//  sdict _27
+//     4 PUSHINT	//  sdict _27 _28=4
+//     ROT
+//     8 PUSHPOW2	//  _27 _28=4 sdict _29=256
+//     DICTISETB	//  sdict
+// }>
+
+.s
+cr
+."---------------------------------"
+cr 
+
+x{aabb0000cc00dd00}
+B{} swap 0 { dup 0= rot dup sbits rot and } { 1 B@+ swap dup dup Blen 8 * B>i@ 0 = { 3 roll dup Blen 0> { Bhash 3 roll drop swap drop B{} -rot } { 3 -roll drop swap } cond } { 3 roll swap B+ -rot swap } cond } while rot drop	//  _3 _2
+."result " .s
+
+cr
+swap 
+drop // S
+B{} swap 0 { dup 0= rot dup sbits rot and } { 1 B@+ swap dup dup Blen 8 * B>i@ 0 = { 3 roll dup Blen 0> { Bhash 3 roll drop swap drop B{} -rot } { 3 -roll drop swap } cond } { 3 roll swap B+ -rot swap } cond } while rot drop	//  _3 _2
+."result " .s
+
+cr
+swap 
+drop // S
+B{} swap 0 { dup 0= rot dup sbits rot and } { 1 B@+ swap dup dup Blen 8 * B>i@ 0 = { 3 roll dup Blen 0> { Bhash 3 roll drop swap drop B{} -rot } { 3 -roll drop swap } cond } { 3 roll swap B+ -rot swap } cond } while rot drop	//  _3 _2
+."result " .s
+
+cr 
+."--------------------------------------"
+cr
+
+B{}
+|
+x{aabb0000cc00dd00} // 8m slice
+// T, S
+{ dup sbits }
+{
+    1 B@+           // B, T, S -> B, T, b, S    - returns first byte and remainder
+
+    swap            // B, T, b, S -> B, T, S, b 
+    dup dup Blen 8 * 
+    B>i@ 0 = {   // if b == 0
+        3 roll      // B, T, S, b -> T, S, b, B
+
+        dup Blen 0> {
+            Bhash       // T, S, b, B -> T, S, b, H - calculate hash from bytes
+            3 roll      // T, S, b, H -> S, b, H, T
+            swap        // S, b, H, T -> S, b, T, H
+            ,           // S, b, T, H -> S, b, T    - append hash to T
+            swap        // S, b, T -> S, T, b
+            drop        // S, T
+            B{}         // S, T, B
+            swap        // S, B, T
+            rot         // S, B, T -> B, T, S
+        }
+        {               // T, S, b, B
+            3 -roll     // T, S, b, B -> B, T, S, b
+            drop        // B, T, S, b -> B, T, S
+        } cond
+    } 
+    {               // B, T, S, b
+        3 roll      // B, T, S, b -> T, S, b, B
+        swap        // T, S, b, B -> T, S, B, b
+        B+          // T, S, B, b -> T, S, B
+        -rot        // T, S, B -> B, T, S
+    } cond
+} while
+rot // B, T, S -> T, S, B
+2drop
+.dump
+cr cr
+B{aabb} Bhash .dump
+B{ccdd} Bhash .dump
+cr
+."duuuump it"
+
+// 1 0 rot { -rot over + swap rot 2dup >= } until drop
+
+
+cr 
+."--------------------------"
+cr
+| B{aaaa}, 3 , 9 , 8 , .dump
+// 2 [] 
+B{aaaa} Bhash =: tb
+cr
+tb .dump
+cr 
+tb 256 u>B .dump
+cr
+tb 256 u>B 256 B>u@ .dump
+cr
+."----------------------" cr
+x{ab73626a6f6a726b787663626c7872696e616775786576757068777363746a6e79736763776f776a77676b7769776d626d66777077747a6871736d7270786b6d797a756b726564647976697a75726f6a7a616b7762786b77706b686c68736375726978767a757a6e776c62676879756575727a73696c6b727861666b6a77} =: cs
+cs .dump
+cr
+x{74650074} =: sl
+sl .dump
+sl 8 i@+ swap .dump
+8 i@+ swap .dump
+8 i@+ swap .dump
+8 i@+ swap .dump
+
+
+
+cr 
+B{aa5555} .dump
+cr 
+cr 
+x{aabbcc} 8 i@+ slice =: bchunk
+
+."daaaamn " bchunk .dump
+cr 
+."hereee"
+<b bchunk B, >b =: cell
+cell .dump
+
+
+
+cr
+
+"tes2ť2t" $>s =: ts
+ts s>c =: tc
+ts csr.
+
+1 2 3 4 5
+5 list =: tl
+tl .l 
+// tl 6 ,
+
+| 2 , 3 , 9 , 8 , 2 [] .dump
+
+tl .l
+// NEWC .dump
+// =: temphash
+<b ts shash B, b> <s csr.
+// SHA256U
+// mc <s csr.
+
+// mhash csr.
+// tc HASHCU
+
+// NEWC 32 STU 256 STU ENDC c4 POP
+// DECLPROC recv_external
+// recv_external PROC:<{
+//     //  in_msg
+//     NEWC	//  in_msg _2
+//     SWAP	//  _2 in_msg
+//     STSLICER	//  _3
+//     ENDC	//  tc
+//     HASHCU	//  _5
+// }>
+
+."Creating new wallet in workchain " wc .

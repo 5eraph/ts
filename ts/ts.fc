@@ -1,0 +1,582 @@
+(int, int, int, int, int, int, cell, cell) loadData() {
+    var cs = get_data().begin_parse();
+    ;; optionaly increase seq number capacity
+    return (cs~load_uint(256), cs~load_uint(16), cs~load_grams(), cs~load_uint(32), cs~load_uint(32), cs~load_uint(7), cs~load_dict(), cs~load_ref());
+}
+
+() saveData(int owner, int seq, int price, int endOfSale, int endOfRefunds, int refundPercentage, cell store, cell eventInfo) impure {
+    set_data(begin_cell()
+        .store_uint(owner, 256)
+        .store_uint(seq, 16)
+        .store_grams(price)
+        .store_uint(endOfSale, 32)
+        .store_uint(endOfRefunds, 32)
+        .store_uint(refundPercentage, 7)
+        .store_dict(store)
+        .store_ref(eventInfo)
+        .end_cell());
+}
+
+cell pack_uint(int value, int length) {
+    return begin_cell().store_uint(value, length).end_cell();
+}
+
+int unpack_uint(cell value, int length) {
+    return value.begin_parse().preload_uint(length);
+}
+
+cell pack_record(int tickets, int seqno) {
+    return begin_cell().store_uint(tickets, 8).store_uint(seqno, 16).end_cell();
+}
+
+(int, int) unpack_record(cell value) {
+    if (value.cell_null?()) {
+        return (0, 0);
+    }
+    var valueS = value.begin_parse();
+    var tickets = valueS~load_uint(8);
+    var seqno = valueS~load_uint(16);
+    return (tickets, seqno);
+}
+
+cell pack_addr(slice value) {
+    return begin_cell().store_slice(value).end_cell();
+}
+
+slice unpack_addr(cell value, int length) {
+    var svalue = value.begin_parse();
+    return svalue~load_msg_addr();
+}
+
+int refundValue(int price, int refundPercentage) {
+    var _base = 100;
+    if (refundPercentage < _base) {
+        return (price / 100) * refundPercentage;   
+    } else {
+        return price;
+    }
+}
+
+;; @returns store, exit code, remainer
+(cell, int, int) buy_ticket(cell store, int price, int owner, int paid, int count) {  
+    if (owner == 0) { ;; invalid owner
+        return (store, 6, paid); 
+    }
+    int remainer = paid - (count * price);
+    if (remainer < 0) { ;; didnt pay enough, return error and paid
+        return (store, 1, 0);
+    } else {
+        var _availableTicketsCell = store.udict_get_ref(256, 0);
+        
+        var _availableTickets = 0; 
+        ifnot (_availableTicketsCell.cell_null?()) { 
+            _availableTickets = unpack_uint(_availableTicketsCell, 24);
+        }
+
+        ifnot (_availableTickets >= count) { ;; not enough tickets for sale
+            return (store, 2, 0);
+        }
+
+        var ownedTicketsCell = store.udict_get_ref(256, owner);
+        var _ownedTickets = 0;
+        var _seqno = 0;
+        ifnot (ownedTicketsCell.cell_null?()) {
+            (_ownedTickets, _seqno) = unpack_record(ownedTicketsCell);
+        }
+   
+        _ownedTickets = _ownedTickets + count;
+        if (_ownedTickets - 255 > 0) { ;; ticket limit per account exceeded
+            return (store, 3, 0);
+        }
+
+        _availableTickets = _availableTickets - count;
+
+        store~udict_set_ref(256, 0, pack_uint(_availableTickets, 24));
+        store~udict_set_ref(256, owner, pack_record(_ownedTickets, _seqno));
+        return (store, 0, remainer);
+    }
+}
+
+;; @returns store, exit code, remainer
+(cell, int, int) refund_ticket(cell store, int seqno, int refundPercentage, int price, int owner, int paid, int count) {
+    if (owner == 0) { ;; invalid owner
+        return (store, 6, 0); 
+    }
+
+    var ownedTicketsCell = store.udict_get_ref(256, owner);
+    if (ownedTicketsCell.cell_null?()) { ;; not enough owned tickets
+        return (store, 4, 0); 
+    }
+
+    (var _ownedTickets, var _seqno) = unpack_record(ownedTicketsCell);
+    ifnot (_seqno == seqno) { ;; replay protection
+        return (store, 7, 0); 
+    } 
+
+    _ownedTickets = _ownedTickets - count;
+    if (_ownedTickets < 0) { ;; not enough owned tickets
+        return (store, 4, 0); 
+    }
+
+    var _availableTicketsCell = store.udict_get_ref(256, 0);
+    var _availableTickets = 0; 
+    ifnot (_availableTicketsCell.cell_null?()) { 
+        _availableTickets = unpack_uint(_availableTicketsCell, 24);
+    }
+    _availableTickets = _availableTickets + count;
+
+    if (_ownedTickets == 0) {
+        store~udict_delete?(256, owner);
+    } else {
+        store~udict_set_ref(256, owner, pack_record(_ownedTickets, _seqno + 1));
+    }
+    store~udict_set_ref(256, 0, pack_uint(_availableTickets, 24));
+    
+    int remainer = (count * refundValue(price, refundPercentage));
+    return(store, 0, remainer);
+}
+
+;; @returns store, exit code, remainer
+(cell, int) transfer_ticket(cell store, int seqno, int owner, int newOwner, int count) {
+    if ((owner == 0) | (newOwner == 0)) { ;; invalid owner
+        return (store, 6); 
+    }
+
+    var ownedTicketsCell = store.udict_get_ref(256, owner);
+    if (ownedTicketsCell.cell_null?()) { ;; not enough owned tickets
+        return (store, 4); 
+    }
+
+    (var _ownedTickets, var _seqno) = unpack_record(ownedTicketsCell);
+    ifnot (_seqno == seqno) { ;; replay protection
+        return (store, 7); 
+    } 
+
+    _ownedTickets = _ownedTickets - count;
+    if (_ownedTickets < 0) { ;; not enough owned tickets
+        return (store, 4); 
+    }
+  
+    var newOwnerTicketsCell = store.udict_get_ref(256, newOwner);
+    var _newOwnerOwnedTickets = 0;
+    var _newOwnerSeqno = 0;
+    ifnot (newOwnerTicketsCell.cell_null?()) {
+        (_newOwnerOwnedTickets, _newOwnerSeqno) = unpack_record(newOwnerTicketsCell);
+    }
+
+    _newOwnerOwnedTickets = _newOwnerOwnedTickets + count;
+
+    if (_newOwnerOwnedTickets - 255 > 0) { ;; ticket limit per account exceeded
+        return (store, 3);
+    }
+
+    if (_ownedTickets == 0) {
+        store~udict_delete?(256, owner);
+    } else {
+        store~udict_set_ref(256, owner, pack_record(_ownedTickets, _seqno + 1));
+    }
+    store~udict_set_ref(256, newOwner, pack_record(_newOwnerOwnedTickets, _newOwnerSeqno));
+    return (store, 0);
+}
+
+;; from adns-logic.fc not sure which entry 370
+() send_message(slice addr, int tag,   int query_id, int body, int grams, int mode) impure {
+	;; int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool src:MsgAddress -> 011000 0x18
+	var msg = begin_cell()
+		.store_uint (0x18, 6)
+		.store_slice(addr)
+		.store_grams(grams)
+		.store_uint (0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
+		.store_uint (tag, 4)
+		.store_uint (query_id, 64);
+	if (body >= 0) {
+		msg~store_uint(body, 32);
+	}
+	send_raw_message(msg.end_cell(), mode);
+}
+
+;;Public Methods
+
+;; Validation method would be used by some kind of terminal/verifier device where terminal operator provides 
+;; customer with random generated code for signing, user signs this code with private key paired with public key holding
+;; tickets and provides signature data to terminal operator. 
+;; (This process would be automated through rest API and wallet app or QR codes)
+;; Terminal verifies response from contracts and in central system notes count of used tickets from this public key
+;; to prevent replay attack
+;; workflow: 
+;; 1. customer provides public key and number of tickets to redeem
+;; 2. we verify that customer purshased ticket count is greater or equal to used ticket count (noted in central system) + count of tickets to redeem
+;; 3. we provide customer one time data to sign
+;; 4. customer provides back signature 
+;; 5. if bellow method returns true (-1) we add redeemed tickets to used tickets
+;; 6. customer is allowed (-1) or denied (0) to join the event
+int proof_ownership(int owner, cell data, cell signatureC) method_id {
+    var signature = signatureC.begin_parse();
+    return check_signature(cell_hash(data), signature, owner);
+}
+
+int owned_tickets(int owner) method_id {
+    (var _contractOwner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = loadData();  
+    var _ownedTicketsCell = store.udict_get_ref(256, owner);
+    if (_ownedTicketsCell.cell_null?()) {
+        return 0;
+    }
+    (var _ownedTickets, var seqno) = unpack_record(_ownedTicketsCell);
+    return _ownedTickets;
+}
+
+int available_tickets() method_id {
+    (var _contractOwner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = loadData();  
+    var _availableTicketsCell = store.udict_get_ref(256, 0);
+    if (_availableTicketsCell.cell_null?()) {
+        return 0;
+    }
+    var _ownedTickets = unpack_uint(_availableTicketsCell, 24);
+    return _ownedTickets;
+}
+
+int refunds_accepted() method_id {
+    (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = loadData();
+    var _now = now();
+    return (_now < endOfSale) & (_now < endOfRefunds);
+}
+
+int refunds_ends() method_id {
+    (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo)  = loadData();
+    if (endOfSale - endOfRefunds > 0) {
+        return endOfRefunds;
+    } else {
+        return endOfSale;
+    }
+}
+
+int sale_ends() method_id {
+    (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo)  = loadData();
+    return endOfSale;
+}
+
+int refund_percentage() method_id {
+    (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo)  = loadData();
+    var _now = now();
+    var refundsAccepted = (_now < endOfSale) & (_now < endOfRefunds);
+    ifnot (refundsAccepted) {
+        return 0;
+    } elseif (refundPercentage > 100) {
+        return 100;
+    } else {
+        return refundPercentage; 
+    }
+}
+
+int get_owner() method_id {
+    (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo)  = loadData();
+    return owner;
+}
+
+int get_price() method_id {
+    (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo)  = loadData();
+    return price;
+}
+
+int seqno() method_id {
+    (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = loadData();
+    return seq;
+}
+
+int customer_seqno(int owner) method_id {
+    (var _contractOwner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = loadData();
+    var _ownedTicketsCell = store.udict_get_ref(256, owner);
+    if (_ownedTicketsCell.cell_null?()) {
+        return 0;
+    }
+    (var _ownedTickets, var seqno) = unpack_record(_ownedTicketsCell);
+    return seqno;
+}
+
+;; customers should be able to verify originality of contract by obtaining signed by organizator event info 
+;; should means in this context, that it is in contract owner and organizator interest to sign it
+;; in context of this contract organizator and contract owner may be different subjects - e.g. artist and reseller
+cell event_info() method_id {
+    (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = loadData();
+    return eventInfo;
+}
+
+;; Subroutines
+
+;; TEST LOCALLY
+;; 1. Comment out recv_internal and recv_external and uncomment main
+;; 2. Run `func <path to stdlibDir>/stdlib.fc ts.fc -o ts.fif && fift -I <path to fift libDir> ts_test_local.fift` 
+;; 3. Execution ends with one on two numbers printed out in terminal
+;;     a) one number - execution completed successfully
+;;     b) two number - execution failed with error code - 2nd number, you should investigate the issues
+;;
+;;() main() impure {
+;;    ;; test data
+;;    var owner = 200;
+;;    var hash = 125;
+;;    var seq = 5;
+;;    var price = 100;
+;;    var test_now = 255; ;; runvm does not provide now(), so we have to substite
+;;    var endOfSale = 265;
+;;    var endOfRefunds = 260;
+;;    var refundPercentage = 90;
+;;    var store = new_dict();
+;;    store~udict_set_ref(256, 0, begin_cell().store_uint(1000, 24).end_cell());
+;;    var eventInfo = begin_cell().store_uint(0x7465737420696e666f, 256).end_cell();    
+;;
+;;    ;; TEST STORE
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    (var _owner, var _seq, var _price, var _endOfSale, var _endOfRefunds, var _refundPercentage, var _store, var _eventInfo) = loadData();
+;;
+;;    throw_unless(1, (_owner == owner) & (_seq == seq) & 
+;;        (_price == price) & (_endOfSale == endOfSale) & 
+;;        (_endOfRefunds == endOfRefunds) & (_refundPercentage == refundPercentage) &
+;;        (cell_hash(_store) == cell_hash(store)) & (cell_hash(_eventInfo) == cell_hash(eventInfo)));
+;;
+;;    ;; TEST BUY
+;;    int exitCode = 0;
+;;    int remainer = 0;
+;;    (store, exitCode, remainer) = buy_ticket(store, price, owner + 1, 1000, 5); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(2, (exitCode == 0) & (remainer == 500) & (owned_tickets(owner + 1) == 5) & (available_tickets() == 995));
+;;
+;;    ;; low payment
+;;    (store, exitCode, remainer) = buy_ticket(store, price, owner + 1, 400, 5); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(3, (exitCode == 1) & (remainer == 400) & (owned_tickets(owner + 1) == 5) & (available_tickets() == 995));
+;;
+;;    ;; wrong owner
+;;    (store, exitCode, remainer) = buy_ticket(store, price, 0, 500, 5); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(4, (exitCode == 6) & (remainer == 500) & (available_tickets() == 995));
+;;
+;;    ;; just equal payment
+;;    (store, exitCode, remainer) = buy_ticket(store, price, owner + 1, 500, 5); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(5, (exitCode == 0) & (remainer == 0) & (owned_tickets(owner + 1) == 10) & (available_tickets() == 990));
+;;
+;;    ;; higher payment 
+;;    (store, exitCode, remainer) = buy_ticket(store, price, owner + 1, 1100, 10); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(6, (exitCode == 0) & (remainer == 100) & (owned_tickets(owner + 1) == 20) & (available_tickets() == 980));
+;;
+;;    ;; limit exceeded
+;;    (store, exitCode, remainer) = buy_ticket(store, price, owner + 1, 24000, 240); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(7, (exitCode == 3) & (remainer == 24000) & (owned_tickets(owner + 1) == 20) & (available_tickets() == 980));
+;;
+;;    ;; TEST REFUND
+;;    (store, exitCode, remainer) = refund_ticket(store, 0, refundPercentage, price, owner + 1, 10, 10); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(9, (exitCode == 0) & (remainer == 910) & (owned_tickets(owner + 1) == 10) & (available_tickets() == 990));
+;;
+;;    ;; more than owned
+;;    (store, exitCode, remainer) = refund_ticket(store, 1, refundPercentage, price, owner + 1, 10, 15); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(10, (exitCode == 4) & (remainer == 10) & (owned_tickets(owner + 1) == 10) & (available_tickets() == 990));
+;;
+;;    ;; wrong owner
+;;    (store, exitCode, remainer) = refund_ticket(store, 1, refundPercentage, price, 0, 10, 10); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(11, (exitCode == 6) & (remainer == 10) & (owned_tickets(owner + 1) == 10) & (available_tickets() == 990));
+;;
+;;    ;; same as owned 
+;;    (store, exitCode, remainer) = refund_ticket(store, 1, refundPercentage, price, owner + 1, 10, 5); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(12, (exitCode == 0) & (remainer == 460) & (owned_tickets(owner + 1) == 5) & (available_tickets() == 995));
+;;
+;;    ;; less than owned
+;;    (store, exitCode, remainer) = refund_ticket(store, 2, refundPercentage, price, owner + 1, 20, 2); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(13, (exitCode == 0) & (remainer == 200) & (owned_tickets(owner + 1) == 3) & (available_tickets() == 997));
+;;
+;;    ;; TEST TRANSFER
+;;    (store, exitCode) = transfer_ticket(store, 3, owner + 1, owner + 2, 2); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(16, (exitCode == 0) & (owned_tickets(owner + 1) == 1) & (owned_tickets(owner + 2) == 2) & (available_tickets() == 997));    
+;;
+;;    ;; not enough to transfer
+;;    (store, exitCode) = transfer_ticket(store, 4, owner + 1, owner + 2, 2); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(17, (exitCode == 4) & (owned_tickets(owner + 1) == 1) & (owned_tickets(owner + 2) == 2) & (available_tickets() == 997));      
+;;
+;;    ;; wrong owner
+;;    (store, exitCode) = transfer_ticket(store, 4, 0, owner + 2, 2); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(18, (exitCode == 6) & (owned_tickets(owner + 1) == 1) & (owned_tickets(owner + 2) == 2) & (available_tickets() == 997));   
+;;
+;;    ;; wrong new owner
+;;    (store, exitCode) = transfer_ticket(store, 4, owner + 2, 0, 2); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(18, (exitCode == 6) & (owned_tickets(owner + 1) == 1) & (owned_tickets(owner + 2) == 2) & (available_tickets() == 997));   
+;;
+;;    ;; limit exceeded
+;;    (store, exitCode, remainer) = buy_ticket(store, price, owner + 1, 20000, 200); 
+;;    (store, exitCode, remainer) = buy_ticket(store, price, owner + 2, 20000, 200); 
+;;    (store, exitCode) = transfer_ticket(store, 4, owner + 1, owner + 2, 200); 
+;;    saveData(owner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+;;    throw_unless(18, (exitCode == 3) & (owned_tickets(owner + 1) == 201) & (owned_tickets(owner + 2) == 202) & (available_tickets() == 597));  
+;;}
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    if (in_msg.slice_refs() == 0) { return(); } 
+	slice cs = in_msg_cell.begin_parse();
+    
+    ;; we stop processing
+	int flags = cs~load_uint(4);
+	if (flags & 1) { return (); } ;; ignore bounced msgs
+
+    var msgC = in_msg~load_ref();
+    if (msgC.cell_null?()) { return(); } ;; transfer without additional processing needed
+
+    var msg = msgC.begin_parse();
+    var op = msg~load_uint(3);
+    if (op == 0) { return(); } ;; transfer without additional processing needed
+                          
+    int paid = msg_value - 1000000000; ;; makes sure that sender paid processing fee  
+    if (paid < 0) {
+        return (); ;; not enough funds for processing, we wont send msg back to prevent fund depletion
+    }
+
+	slice s_addr = cs~load_msg_addr();
+    var query_id = msg~load_uint(64);
+    if (op > 4) { ;; unknown query, return error and any gram value above processing fee
+        return send_message(s_addr, 15, query_id, op, paid, 0);
+    }
+
+    ;; For testing
+    ;;    (var _contractOwner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = (200, 0, 1000000000, 300, 200, 90, new_dict(), begin_cell().end_cell());
+    ;;    store~udict_set_ref(256, 0, pack_uint(1000, 24));
+    ;;    saveData(_contractOwner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo); 
+
+    (var _contractOwner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = loadData();
+    
+    if ((op == 1) | (op == 4)) { ;; buy tickets, no need to verify owner here, basically we allow to buy as gift 
+        if (endOfSale < now()) { ;; not for sale anymore
+            return send_message(s_addr, 5, query_id, op, 0, 64); 
+        }
+    
+        var owner = msg~load_uint(256);
+        var count = msg~load_uint(8);
+
+        (store, int exitCode, int remainer) = buy_ticket(store, price, owner, paid, count); 
+        
+        if ((op == 4) & (exitCode == 0)) { ;; customer considers remainer a tip for us
+            send_message(s_addr, exitCode, query_id, op, 1000000000, 0); ;; tickets bought, we send success message
+        } elseif (exitCode == 0) {
+            send_message(s_addr, exitCode, query_id, op, remainer + 1000000000, 0); ;; tickets bought, we send success message
+        } else {
+            send_message(s_addr, exitCode, query_id, op, 0, 64); ;; tickets buy failed
+        }
+        saveData(_contractOwner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo); 
+        return();       
+    } elseif (op == 2) { ;; refund tickets, we need to verify the owner
+        ifnot (refunds_accepted()) {
+            return send_message(s_addr, 13, query_id, op, 0, 64);
+        }
+        var seqno = msg~load_uint(16);
+        var owner = msg~load_uint(256);  
+        var count = msg~load_uint(8);
+         
+        ;; in case of internal messages, signature is aligned after msg content
+        var signatureC = in_msg~load_ref();
+        if (signatureC.cell_null?()) {
+            return send_message(s_addr, 14, query_id, op, 0, 64);
+        }
+        var signatureS = signatureC.begin_parse();
+        var signature = signatureS~load_bits(512);
+
+        ifnot (check_signature(cell_hash(msgC), signature, owner)) { ;; non signed ticket refund -> return
+            return send_message(s_addr, 14, query_id, op, 0, 64);
+        }
+        
+        (store, int exitCode, int remainer) = refund_ticket(store, seqno, refundPercentage, price, owner, paid, count);
+
+        send_message(s_addr, exitCode, query_id, op, remainer, 64); ;; send confirmation with remaining grams and result
+        saveData(_contractOwner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+        return ();
+    } else { ;; transfer tickets, we need to verify the owner
+        if (endOfSale < now()) { ;; not for sale anymore
+            return send_message(s_addr, 5, query_id, op, 0, 64); 
+        }
+        var seqno = msg~load_uint(16);
+        var owner = msg~load_uint(256);
+        var newOwner = msg~load_uint(256);
+        var count = msg~load_uint(8);
+        
+        var signatureC = in_msg~load_ref();
+        if (signatureC.cell_null?()) {
+            return send_message(s_addr, 14, query_id, op, 0, 64);
+        }
+        
+        var signatureS = signatureC.begin_parse();
+        var signature = signatureS~load_bits(512);
+        
+        ifnot (check_signature(cell_hash(msgC), signature, owner)) { ;; non signed ticket transfer -> return
+            return send_message(s_addr, 14, query_id, op, 0, 64);
+        }
+        
+        (store, int exitCode) = transfer_ticket(store, seqno, owner, newOwner, count);
+        send_message(s_addr, exitCode, query_id, op, 0, 64); ;; send confirmation with remaining grams and result
+        saveData(_contractOwner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+        return ();
+    }
+}
+
+() recv_external(slice in_msg) impure { 
+    throw_if(34, in_msg.slice_empty?()); ;; in_msg has to contain signature so if empty throw
+
+    ;; external messages are accepted only from owner
+    var signature = in_msg~load_bits(512);
+
+    (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = loadData();
+    ;; for testing:
+    ;; (var owner, var seq, var price, var endOfSale, var endOfRefunds, var refundPercentage, var store, var eventInfo) = (200, 0, 10, 300, 200, 90, new_dict(), begin_cell().end_cell());
+    throw_unless(35, check_signature(slice_hash(in_msg), signature, owner));
+
+    var query_id = in_msg~load_uint(64);
+    var bound = (now() << 32);
+    throw_unless(35, query_id > bound);
+    
+    var query_seq = in_msg~load_uint(16);
+    throw_unless(36, seq == query_seq);
+
+    int op = in_msg~load_uint(3);
+    throw_unless(37, op < 6); ;; accept only valid ops
+
+    accept_message(); 
+    if (op == 0) { ;; init msg
+        saveData(owner, seq + 1, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+        return ();
+    }
+    if (op == 1) { ;; set available_tickets
+        ;; this is for case when we use more points of sale and we want to adjust 
+        ;; available tickets based on sales in differnet places
+        var count = in_msg~load_uint(24);
+        store~udict_set_ref(256, 0, pack_uint(count, 24));
+    } elseif (op == 2) { ;; set refunds timeout
+        ;; refund timeout and refundPercentage are configurable to allow adjust continuous change of refunds
+        ;; e.g. 
+        ;; up to 3 months before the event refund 100%
+        ;; up to 2 months before the event refund 75%
+        ;; up to 1 months before the event refund 50%
+        endOfRefunds  = in_msg~load_uint(32);
+    } elseif (op == 3) { ;; set refunds percentage
+        refundPercentage = in_msg~load_uint(7);
+    } elseif (op == 4) { ;; send raw messages - for withdrawal
+        while (in_msg.slice_refs()) {
+            var mode = in_msg~load_uint(8);
+            send_raw_message(in_msg~load_ref(), mode);
+       }
+    } elseif (op == 5) { ;; set eventInfo
+        eventInfo = in_msg~load_ref();
+    }
+
+    if (query_seq == 65535) { ;; reset query number 
+        query_seq = 0;
+    }
+    saveData(owner, seq + 1, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+    return ();
+}
+

@@ -1,0 +1,54 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+<{ SETCP0 DUP IFNOTRET // return if recv_internal
+   DUP 85143 INT EQUAL IFJMP:<{ // "seqno" get-method
+     DROP c4 PUSHCTR CTOS 32 PLDU  // cnt
+   }>
+   INC 32 THROWIF  // fail unless recv_external
+   512 INT LDSLICEX DUP 32 PLDU   // sign cs cnt
+   DUMPSTK
+   c4 PUSHCTR CTOS 32 LDU 256 LDU ENDS  // sign cs cnt cnt' pubk
+   s1 s2 XCPU            // sign cs cnt pubk cnt' cnt
+   DUMPSTK
+   EQUAL 33 THROWIFNOT   // ( seqno mismatch? )
+   s2 PUSH HASHSU        // sign cs cnt pubk hash
+   s0 s4 s4 XC2PU        // pubk cs cnt hash sign pubk
+   CHKSIGNU              // pubk cs cnt ?
+   34 THROWIFNOT         // signature mismatch
+   ACCEPT
+   SWAP 32 LDU NIP 
+   DUP SREFS IF:<{
+     // 3 INT 35 LSHIFT# 3 INT RAWRESERVE    // reserve all but 103 Grams from the balance
+     8 LDU LDREF         // pubk cnt mode msg cs
+     s0 s2 XCHG SENDRAWMSG  // pubk cnt cs ; ( message sent )
+   }>
+   ENDS
+   INC NEWC 32 STU 256 STU ENDC c4 POPCTR
+}>c // >libref
+
+// "highload-wallet-v2-code.fif" include
+dup constant code
+-1 0x1111111111111111111111111111111111111111111111111111111111111111 2constant addr
+"./test.pk" load-generate-keypair constant wallet_pk constant public_key
+
+<b 0 32 u,  public_key B, b> constant data
+
+<b b{0011} s, code ref, data ref, null dict, b> constant state_init
+<b 0 32 u, b> constant seqno
+seqno hash wallet_pk ed25519_sign_uint constant signing_bin
+
+// stack.push_int(balance.grams);
+0
+// stack.push_int(msg_balance_remaining.grams);
+0
+// stack.push_cell(in_msg);
+<b b{1000100} s, addr addr, b{000010} s, state_init ref,
+  // body:(Either X ^X)
+  b{0} s, signing_bin B, seqno <s s,        // THIS IS SECTION OF MESSAGE X BODY
+b>
+// stack.push_cellslice(in_msg_body);
+<b signing_bin B, seqno <s s, b> <s // COPY OF MESSAGE X BODY
+// stack.push_bool(in_msg_extern);
+-1
+code <s data runvm drop .s 0 <> { 1 halt } if

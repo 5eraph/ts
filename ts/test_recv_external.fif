@@ -1,0 +1,18 @@
+"Asm.fif" include
+
+// requires additional changes in sw.fif
+// 1. rename recv_external to main
+// 2. replace now() with static value
+// 3. comment out signature check or add signature addition in code bellow
+
+// <b 1 64 u, 0 16 u, 1 3 u, 1000 24 u, b> <s // set tickets
+// <b 1 64 u, 0 16 u, 2 3 u, 225 32 u, b> <s // set end of refunds
+// <b 1 64 u, 0 16 u, 3 3 u, 75 7 u, b> <s // set refund percentage
+// <b 1 64 u, 0 16 u, 4 3 u, 75 7 u, b> <s // send msg
+<b 1 64 u, 0 16 u, 5 3 u, <b 1234 32 i, b> ref, b> <s // set event info
+
+PROGRAM{ 
+    "ts.fif" include
+}END>s =: code
+code
+runvmdict .s

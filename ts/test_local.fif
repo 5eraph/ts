@@ -1,0 +1,8 @@
+"Asm.fif" include
+
+
+PROGRAM{ 
+    "ts.fif" include
+}END>s =: code
+code
+runvmdict .s

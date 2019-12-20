@@ -1,0 +1,51 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+{ ."usage: " @' $0 type ." <filename-base> <contract-addr> <domain> <dnsrecord> <cat>" cr
+    ."<domain>    - String" cr
+    ."<dnsrecord> - String" cr
+    ."<cat>       - int" cr
+    ."Adds or changes dnsrecord in contract storage" cr
+} : usage
+// 2- -2 and '
+$# 5 - 0< { usage bye } if
+
+false constant bounce
+
+$1 =: file-base
+$2 bounce parse-load-address =: bounce 2=: contractAddr // kf-Cn1bSHIjalMGU3GUWWqxOfnNEQTV2h1Nq9hEBC08vG9Ln
+$3 =: domain
+$4 =: dnsrecord
+$5 parse-int =: cat
+
+file-base +".pk" load-keypair nip constant resolver_pk
+
+// prepare cells
+// for slice testing e.g. passing zero bytes requires manual editing 
+// <b x{aabb00cc} s, b> constant domainCell
+<b domain $, b> constant domainCell
+<b dnsrecord $, b> constant dnsrecordCell
+
+65536 constant timeout
+now timeout + 32 << 1- dup =: query_id
+
+<b query_id 64 u, 0 32 i, domainCell ref, dnsrecordCell ref, cat 16 i, b> constant msg
+
+dup ."signing message: " msg <s csr. cr
+msg hashu resolver_pk ed25519_sign_uint constant signing_bin
+
+<b 
+    b{1000100} s, 
+    contractAddr addr, 
+    0 Gram, 
+    b{00} s,
+    signing_bin B, 
+    msg <s s, 
+b>
+
+dup ."External message for initialization is " <s csr. cr
+2 boc+>B // create bag of cells with crc32 embedded
+dup Bx. cr // prints bag of cells in hex
+
+file-base +"-setdomain-query.boc" tuck B>file // saves query
+."(Saved resolver creating query to file " type .")" cr

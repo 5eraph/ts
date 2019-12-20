@@ -1,0 +1,38 @@
+B{} swap 0 // B, S, H
+{ dup 0= rot dup sbits rot and }
+{   // B, H, S
+    1 B@+           // B, H, S -> B, H, b, S    - returns first byte and remainder
+
+    swap            // B, H, b, S -> B, H, S, b 
+    dup dup Blen 8 * 
+    B>i@ 0 = {   // if b == 0
+        3 roll      // B, H, S, b -> H, S, b, B
+
+        dup Blen 0> {
+            Bhash       // H, S, b, B -> H, S, b, H - calculate hash from bytes
+            3 roll      // H, S, b, H -> S, b, H, H
+            drop        // S, b, H, H -> S, b, H
+            swap        // S, b, H -> S, H, b
+            drop        // S, H
+            B{}         // S, H, B technically useless but needed for result consistency
+            -rot        // B, S, H
+        } 
+        {               // H, S, b, B skip any empty zero bytes
+            3 -roll     // H, S, b, B -> B, H, S, b
+            drop        // B, H, S, b -> B, H, S
+            swap        // B, H, S -> B, S, H
+        } cond
+    } 
+    {               // B, H, S, b concat bytes
+        3 roll      // B, H, S, b -> H, S, b, B
+        swap        // H, S, b, B -> H, S, B, b
+        B+          // H, S, B, b -> H, S, B
+        -rot        // H, S, B -> B, H, S
+        swap        // B, H, S -> B, S, H
+    } cond
+} while
+rot // B, S, H -> S, H, B
+drop // S, H
+
+// one line
+B{} swap 0 { dup 0= rot dup sbits rot and } { 1 B@+ swap dup dup Blen 8 * B>i@ 0 = { 3 roll dup Blen 0> { Bhash 3 roll drop swap drop B{} -rot } { 3 -roll drop swap } cond } { 3 roll swap B+ -rot swap } cond } while rot drop

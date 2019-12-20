@@ -1,0 +1,69 @@
+#!/usr/bin/env fift -s
+"TonUtil.fif" include
+"Asm.fif" include
+
+{ ."usage: " @' $0 type ." <workchain-id> <ticketCount> <price> <endOfSale> <endOfRefunds> <refundPercentage> [<filename-base>]" cr
+  ."Creates a new sw validator in the specified workchain, with the controlling private key saved to or loaded from <filename-base>.pk "
+  ."('new-event.pk' by default)" cr 
+} : usage
+$# 2- -2 and ' usage if
+
+$1 parse-workchain-id =: wc    // set workchain id from command line argument
+$2 parse-int =: ticketCount
+ticketCount <{ NEWDICT SWAP 24 PUSHINT NEWC SWAP STUX ENDC 0 PUSHINT ROT 8 PUSHPOW2 DICTUSETREF }>s runvmcode drop =: init_dict
+
+$3 parse-int =: price
+$4 parse-int =: endOfSale
+$5 parse-int =: endOfRefunds
+$6 parse-int =: refundPercentage
+
+def? $7 { @' $7 } { "new-event" } cond constant file-base
+65536 constant timeout   // init query times out in 65536 seconds
+
+."Creating new event in workchain " wc . 
+
+"ts.fif" include
+
+<b 
+    file-base +".pk" load-generate-keypair 
+    constant event_pk B, 
+    0 16 u,
+    price Gram,
+    endOfSale 32 u,
+    endOfRefunds 32 u,
+    refundPercentage 7 u,
+    init_dict dict,
+    <b b> ref,
+b> // initial data
+
+null // no libraries
+
+<b b{0011} s, 3 roll ref, rot ref, swap dict, b>  // create StateInit
+
+dup ."StateInit: " <s csr. cr
+dup hashu wc swap 2dup 2constant event_addr
+."new event address = " 2dup .addr cr
+2dup file-base +".addr" save-address-verbose
+."Non-bounceable address (for init): " 2dup 7 .Addr cr
+."Bounceable address (for later access): " 6 .Addr cr
+now timeout + 32 << 1- dup =: query_id
+."Init query_id is " dup . ."(0x" X._ .")" cr
+
+<b query_id 64 u, 0 16 u, 0 3 u, <b event_pk priv>pub B, b> ref, b>
+dup ."signing message: " <s csr. cr
+dup hashu event_pk ed25519_sign_uint rot
+
+<b b{1000100} s,
+event_addr addr, // append addr
+b{000010} s,
+swap 
+<s s, // append initial state
+b{0} s, 
+swap B, // append signature
+swap <s s, // append msg
+b>
+
+dup ."External message for initialization is " <s csr. cr
+2 boc+>B dup Bx. cr
+"queries/create-event.boc" tuck B>file // saves query
+."(Saved event creating query to file " type .")" cr

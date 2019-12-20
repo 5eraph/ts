@@ -1,0 +1,100 @@
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+
+}
+
+() recv_internal(slice in_msg) impure {
+  ;; do nothing for internal messages
+
+}
+
+() recv_external(slice in_msg) impure {
+
+}
+
+() resolve(int cat, slice in_hash) {
+    var domains = get_data().begin_parse().preload_dict();
+ 
+    var i = 0;
+
+    do 
+    (key, var cs, var f) = domains~udict_get_next(256, key)
+
+
+    if ()
+}
+
+() getNthSubdomain(int n, slice in_subdomain) {
+
+}
+
+B| (B x – B0 B00), cuts the first x bytes from a Bytes value B, and
+returns both the first x bytes (B0
+) and the remainder (B00) as new
+Bytes values.
+
+
+ do {
+    (pubkey, var cs, var f) = members.udict_get_next?(256, pubkey);
+    if (f) {
+      var (stake, time, max_factor, addr, adnl_addr) = (cs~load_grams(), cs~load_uint(32), cs~load_uint(32), cs~load_uint(256), cs~load_uint(256));
+      cs.end_parse();
+      var key = begin_cell()
+        .store_uint(stake, 128)
+        .store_int(- time, 32)
+        .store_uint(pubkey, 256)
+      .end_cell().begin_parse();
+      sdict~dict_set_builder(128 + 32 + 256, key, begin_cell()
+          .store_uint(min(max_factor, max_stake_factor), 32)
+          .store_uint(addr, 256)
+          .store_uint(adnl_addr, 256));
+      n += 1;
+    }
+  } until (~ f);
+
+
+;;  set_data(begin_cell()
+;;    .store_uint(stored_seqno + 1, 32)
+;;    .store_uint(stored_subwallet, 32)
+;;    .store_uint(public_key, 256)
+;;    .end_cell());
+
+;; Simple wallet smart contract
+
+() recv_internal(slice in_msg) impure {
+  ;; do nothing for internal messages
+}
+
+() recv_external(slice in_msg) impure {
+  var signature = in_msg~load_bits(512);
+  var cs = in_msg;
+  var (msg_seqno, valid_until) = (cs~load_uint(32), cs~load_uint(32));
+  throw_if(35, valid_until <= now());
+  var ds = get_data().begin_parse();
+  var (stored_seqno, public_key) = (ds~load_uint(32), ds~load_uint(256));
+  ds.end_parse();
+  throw_unless(33, msg_seqno == stored_seqno);
+  throw_unless(34, check_signature(slice_hash(in_msg), signature, public_key));
+  accept_message();
+  cs~touch();
+  while (cs.slice_refs()) {
+    var mode = cs~load_uint(8);
+    send_raw_message(cs~load_ref(), mode);
+  }
+  cs.end_parse();
+  set_data(begin_cell().store_uint(stored_seqno + 1, 32).store_uint(public_key, 256).end_cell());
+}
+
+;; Get methods
+
+int seqno() method_id {
+  return get_data().begin_parse().preload_uint(32);
+}
+
+int cell_hash_eq?(cell vset, int expected_vset_hash) {
+  return vset.null?() ? false : cell_hash(vset) == expected_vset_hash;
+}
+
+int validator_set_installed(ds, elect, credits) impure {
+  var (elect_at, elect_close, min_stake, total_stake, members, failed, finished) = elect.unpack_elect();
+
+  

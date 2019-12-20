@@ -1,0 +1,68 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+65536 constant timeout
+1 =: subwallet-id
+
+"4.fif" include
+dup constant code
+-1 0x1111111111111111111111111111111111111111111111111111111111111111 2constant addr
+"./new-resolver.pk" load-generate-keypair constant wallet_pk constant public_key
+
+// generate new rootDict
+// newDict is always empty null in current TVM
+// below line are for case of future change :)
+<{ NEWDICT }>s runvmcode drop constant rootDict
+
+<b public_key B, rootDict dict, b> constant data
+
+<b b{0011} s, code ref, data ref, null dict, b> constant state_init
+
+// testing set domain
+// testx{00}nested
+// <b x{74657374006e6573746564} s, b> constant subdomain                // - TEST 0, 2
+// nestedTarget
+// <b x{74657374546172676574} s, b> constant target                     // - TEST 0
+// <b 0 32 i, subdomain ref, target ref, 1 16 i, b> constant initmsg    // - TEST 0 set domain
+
+// <b 2 32 i, subdomain ref, 1 16 i, b> constant initmsg                // - TEST 2 remove domain
+
+now timeout + 32 << 1- dup =: query_id
+
+<b "test" $, b> constant domainCell
+<b "target" $, b> constant dnsrecordCell
+
+// build init msg
+// <b query_id 64 u, 1 32 i, <b public_key B, b> ref, b> constant initmsg                 // - TEST 1 change owner
+// sign init msg
+
+<b 0 32 i, domainCell ref, dnsrecordCell ref, 1 16 i, b> constant initmsg  
+
+initmsg hash wallet_pk ed25519_sign_uint constant signing_bin
+
+// stack.push_int(balance.grams);
+0
+// stack.push_int(msg_balance_remaining.grams);
+0
+// stack.push_cell(in_msg);
+
+"kf-Cn1bSHIjalMGU3GUWWqxOfnNEQTV2h1Nq9hEBC08vG9Ln" false parse-load-address =: false 2=: contractAddr
+// build deployment request
+<b b{1000100} s, contractAddr addr, 0 Gram, 
+    b{00} s, 
+  // body:(Either X ^X)
+   signing_bin B, initmsg <s s,        // THIS IS SECTION OF MESSAGE X BODY
+b>
+contractAddr .s aaa
+cr cr 
+.dump cr cr
+
+// stack.push_cellslice(in_msg_body);
+
+
+<b signing_bin B, initmsg <s s, b> <s // COPY OF MESSAGE X BODY
+
+// stack.push_bool(in_msg_extern);
+-1
+
+code <s data runvm drop .s 0 <> { 1 halt } if

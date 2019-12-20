@@ -1,0 +1,39 @@
+"Asm.fif" include
+"TonUtil.fif" include
+
+// requires additional changes in sw.fif
+// 1. rename recv_external to main
+// 2. replace now() with static value
+// 3. comment out signature check or add signature addition in code bellow
+
+// <b 1 64 u, 0 16 u, 1 3 u, 1000 24 u, b> <s // set tickets
+// <b 1 64 u, 0 16 u, 2 3 u, 225 32 u, b> <s // set end of refunds
+// <b 1 64 u, 0 16 u, 3 3 u, 75 7 u, b> <s // set refund percentage
+// <b 1 64 u, 0 16 u, 4 3 u, 75 7 u, b> <s // send msg
+
+"wallets/stage2.addr" file>B 32 B| 
+dup Blen { 32 B>i@ } { drop Basechain } cond constant wallet_wc
+256 B>u@ constant wallet_addr
+
+"wallets/stage2.pk" load-keypair constant wallet_pk constant wallet_pub
+// dup hashu wallet_pk ed25519_sign_uint
+
+// hashu wallet_pk ed25519_sign_uint
+// 20000000000 <b 0 4 u, wallet_wc 7 u, wallet_addr 256 u, b> <b 2 3 u, 1222 64 u, <b wallet_addr 256 u, b> ref, 15 8 u, b> <s // buy ticket
+
+// wallet_pk priv>pub 256 B>u@ .s
+
+// <b 2 3 u, 1222 64 u, wallet_pub B, 15 8 u, b> =: msg // refund tickets
+// <b 1 3 u, 1222 64 u, wallet_pub B, 15 8 u, b> =: msg // buy tickets
+<b 3 3 u, 1222 64 u, wallet_pub B, wallet_pub B, 15 8 u, b> =: msg // transfer tickets
+// msg <s .s
+msg hashu wallet_pk ed25519_sign_uint =: signature
+
+<b signature B, b> hashu .s
+20000000000 <b 0 4 u, wallet_wc 7 u, wallet_addr 256 u, b> <b msg ref, <b signature B, b> ref, b> <s // refund ticket
+    
+PROGRAM{ 
+    "ts.fif" include
+}END>s =: code
+code
+runvmdict .s

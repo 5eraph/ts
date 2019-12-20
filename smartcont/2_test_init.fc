@@ -1,0 +1,144 @@
+int slice_bytes(slice s) {
+    return slice_bits(s) / 8;
+}
+
+int builder_bits(builder b) asm "BBITS";
+int builder_bytes(builder b) {
+    return builder_bits(b) / 8;
+}
+
+cell emptyCell() asm "NULL";
+slice emptySlice() asm "NULL";
+
+cell toCell(slice s) {
+    return begin_cell().store_slice(s).end_cell();
+}
+cell uintToCell(int u,int n) {
+    return begin_cell().store_uint(u, n).end_cell();
+}
+
+(int, slice) getSubdomain(slice s) {
+    var subdomainB = begin_cell();
+    var hash = 0;
+    while ((hash == 0) & (slice_bytes(s) > 0)) {
+        (s, var byte) = s.load_bits(8);
+        var value = byte.preload_int(8);
+        if (value == 0) { ;; null byte = split
+            if (builder_bits(subdomainB) > 0) {
+                var subdomain = subdomainB.end_cell();
+                hash = cell_hash(subdomain);
+                ;; return (hash, s); branches should both return or both not return
+            }
+        } else {
+            subdomainB = subdomainB.store_slice(byte);
+        }
+    }
+    ifnot (hash == 0) {
+        return (hash, s);
+    }
+
+    ;; allow extraction of last level domain even if not ending with zero byte
+    var remainingBytes = builder_bytes(subdomainB);
+    if (remainingBytes > 0) {
+        var subdomain = subdomainB.end_cell();
+        var hash = cell_hash(subdomain);
+        return (hash, s);
+    }
+    ;; no domain found
+    return (0, s);
+}
+
+(int, slice) hasAdditionalDomain(slice s) {
+    var continue = -1;
+    while (continue & (slice_bytes(s) > 0)) {
+        (var newS, var byte) = s.load_bits(8);
+        var value = byte.preload_int(8);
+        ifnot (value == 0) {
+            continue = 0;
+        } else {
+            s = newS;
+        }
+    }
+    ifnot (continue) {
+        return (-1, s);
+    }
+    return (0, emptySlice());
+}
+
+cell setDictUValue(cell dict, int n, int k, builder v) {
+    (var _k, var record, var f) = dict.udict_get_next?(n, k);
+    if (f) {
+        (dict, var r) = dict.udict_replace_builder?(n, k, v);
+    } else {
+        dict = dict.udict_set_builder(n, k, v);
+    }
+    return dict;
+}
+cell setDictIValue(cell dict, int n, int k, builder v) {
+    (var _k, var record, var f) = dict.idict_get_next?(n, k);
+    if (f) {
+        (dict, var r) = dict.idict_replace_builder?(n, k, v);
+    } else {
+        dict = dict.idict_set_builder(n, k, v);
+    }
+    return dict;
+}
+
+cell setSubdomain(cell dict, slice s, slice dnsRecord, int cat) {
+    (var subdomain, s) = getSubdomain(s);
+    (var k, var record, var f) = dict.udict_get_next?(256, subdomain);
+    
+    var value = new_dict();
+    var childTree = new_dict();
+    if (f) {
+        value = record~load_dict();
+        childTree = record~load_dict();
+    }
+
+    (var addtionalDomain, s) = hasAdditionalDomain(s); 
+    if (addtionalDomain == 0) { ;; we are at lowest level of recursion
+        if (cat == 0) { ;; we got dict
+            childTree = dnsRecord~load_dict();
+        } else {
+            value = value.setDictIValue(16, cat, begin_cell().store_slice(dnsRecord));
+        }
+    } else {
+        childTree = setSubdomain(childTree, s, dnsRecord, cat);
+    }
+
+    return dict.setDictUValue(256, subdomain, begin_cell().store_dict(value).store_dict(childTree));
+}
+
+int setRecord(cell c, cell dnsR, int cat) {
+    var cs = get_data().begin_parse();
+    var s = c.begin_parse();
+    var dnsRecord = dnsR.begin_parse();
+
+    ;; skip owner pub key
+    var owner = cs~load_uint(256);
+    var rootDict = cs~load_dict();
+    cs.end_parse();
+    
+    rootDict = setSubdomain(rootDict, s, dnsRecord, cat);
+
+    set_data(begin_cell()
+        .store_uint(owner, 256)
+        .store_dict(rootDict)
+        .end_cell());
+    return -1;
+}
+
+slice main(slice s) impure {
+    var rootDict = new_dict();
+    rootDict~udict_set_builder(256, 1, begin_cell().store_uint(1, 256));
+    var temp = begin_cell()
+        .store_uint(1000, 256)
+        .store_dict(rootDict)
+        .end_cell();
+    set_data(temp);
+    var subdomain = begin_cell().store_slice(s).end_cell();
+    var dnsRecord = begin_cell().store_slice(s).end_cell();
+    var res = setRecord(subdomain, dnsRecord, 1);
+    throw_unless(34, res == -1);
+    return get_data().begin_parse();
+}
