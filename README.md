@@ -1,9 +1,5 @@
 # TS - Ticket System TON Smart Contract
 
-### TON Stage 2 Note
-
-Looks like bot does not support submitting secondary project, but project guidelines allows submissions of two. Here is the second [SW](https://github.com/5eraph/sw).
-
 ## Scenario
 
 Ticket sales of big events are often affected by malicious actors counterfeiting tickets therefore stealing from customers and complicating the ticket verification process.
