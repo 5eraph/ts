@@ -459,17 +459,21 @@ cell event_info() method_id {
     
         var owner = msg~load_uint(256);
         var count = msg~load_uint(8);
-
-        (store, int exitCode, int remainer) = buy_ticket(store, price, owner, paid, count); 
-        
-        if ((op == 4) & (exitCode == 0)) { ;; customer considers remainer a tip for us
-            send_message(s_addr, exitCode, query_id, op, 1000000000, 0); ;; tickets bought, we send success message
-        } elseif (exitCode == 0) {
-            send_message(s_addr, exitCode, query_id, op, remainer + 1000000000, 0); ;; tickets bought, we send success message
-        } else {
+        if (count == 0) {
+            // fail if trying to buy 0 tickets
             send_message(s_addr, exitCode, query_id, op, 0, 64); ;; tickets buy failed
+        } else {
+            (store, int exitCode, int remainer) = buy_ticket(store, price, owner, paid, count); 
+            
+            if ((op == 4) & (exitCode == 0)) { ;; customer considers remainer a tip for us
+                send_message(s_addr, exitCode, query_id, op, 1000000000, 0); ;; tickets bought, we send success message
+            } elseif (exitCode == 0) {
+                send_message(s_addr, exitCode, query_id, op, remainer + 1000000000, 0); ;; tickets bought, we send success message
+            } else {
+                send_message(s_addr, exitCode, query_id, op, 0, 64); ;; tickets buy failed
+            }
+            saveData(_contractOwner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo); 
         }
-        saveData(_contractOwner, seq, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo); 
         return();       
     } elseif (op == 2) { ;; refund tickets, we need to verify the owner
         ifnot (refunds_accepted()) {
@@ -576,7 +580,7 @@ cell event_info() method_id {
     if (query_seq == 65535) { ;; reset query number 
         query_seq = 0;
     }
-    saveData(owner, seq + 1, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
+    saveData(owner, query_seq + 1, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
     return ();
 }
 
