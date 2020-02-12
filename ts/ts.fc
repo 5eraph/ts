@@ -125,11 +125,7 @@ int refundValue(int price, int refundPercentage) {
     }
     _availableTickets = _availableTickets + count;
 
-    if (_ownedTickets == 0) {
-        store~udict_delete?(256, owner);
-    } else {
-        store~udict_set_ref(256, owner, pack_record(_ownedTickets, _seqno + 1));
-    }
+    store~udict_set_ref(256, owner, pack_record(_ownedTickets, _seqno + 1));
     store~udict_set_ref(256, 0, pack_uint(_availableTickets, 24));
     
     int remainer = (count * refundValue(price, refundPercentage));
@@ -170,11 +166,7 @@ int refundValue(int price, int refundPercentage) {
         return (store, 3);
     }
 
-    if (_ownedTickets == 0) {
-        store~udict_delete?(256, owner);
-    } else {
-        store~udict_set_ref(256, owner, pack_record(_ownedTickets, _seqno + 1));
-    }
+    store~udict_set_ref(256, owner, pack_record(_ownedTickets, _seqno + 1));
     store~udict_set_ref(256, newOwner, pack_record(_newOwnerOwnedTickets, _newOwnerSeqno));
     return (store, 0);
 }
@@ -460,8 +452,8 @@ cell event_info() method_id {
         var owner = msg~load_uint(256);
         var count = msg~load_uint(8);
         if (count == 0) {
-            // fail if trying to buy 0 tickets
-            send_message(s_addr, exitCode, query_id, op, 0, 64); ;; tickets buy failed
+            ;; fail if trying to buy 0 tickets
+            send_message(s_addr, 8, query_id, op, 0, 64); ;; tickets buy failed
         } else {
             (store, int exitCode, int remainer) = buy_ticket(store, price, owner, paid, count); 
             
@@ -554,10 +546,31 @@ cell event_info() method_id {
         saveData(owner, seq + 1, price, endOfSale, endOfRefunds, refundPercentage, store, eventInfo);
         return ();
     }
-    if (op == 1) { ;; set available_tickets
-        ;; this is for case when we use more points of sale and we want to adjust 
-        ;; available tickets based on sales in differnet places
-        var count = in_msg~load_uint(24);
+    if (op == 1) { ;; add available_tickets
+        ;; as reported in https://contest.com/blockchain-2/entry1247#issue10606
+        ;; it is hard to set correct/specific number of available tickets
+        ;; thats why this method is changed to add available tickets
+        ;; substraction is possible with negative numbers
+        ;; this way we make sure that we either encrease or decrease available tickets to desired value
+        ;; any decrease bellow 0 will result in 0 available tickets - in meantime when you decreasing the number
+        ;; of available tickets more tickets can be sold - plan accordingly
+        ;; maximum of available tickets is 16777215, adding more than maximum will result in adjustment to 16777215
+    
+        var count = in_msg~load_int(24);
+        var _availableTicketsCell = store.udict_get_ref(256, 0);
+        
+        var _availableTickets = 0; 
+        ifnot (_availableTicketsCell.cell_null?()) { 
+            _availableTickets = unpack_uint(_availableTicketsCell, 24);
+        }
+
+        var _newAvailableTickets = _availableTickets + count;
+        if (_newAvailableTickets < 0) {
+            _newAvailableTickets = 0;
+        } elseif (_newAvailableTickets > 16777215) {
+            _newAvailableTickets = 16777215;
+        }
+
         store~udict_set_ref(256, 0, pack_uint(count, 24));
     } elseif (op == 2) { ;; set refunds timeout
         ;; refund timeout and refundPercentage are configurable to allow adjust continuous change of refunds

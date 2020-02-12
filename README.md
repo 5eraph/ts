@@ -89,9 +89,10 @@ TS expects internal message body structure as follows:
 5. sale ended
 6. invalid owner - means owner was equal to 0
 7. not matching seqno
-13. refunds not accepted
-14. signature check failed
-15. unknown 
+8. cannot buy 0 tickets
+9.  refunds not accepted
+10. signature check failed
+11. unknown 
 
 ### External Messages
 
@@ -107,8 +108,8 @@ The contract owner is able to change available (not sold) tickets for cases of m
 3 bit - operation 
 ... operation specific data:
 0 - init message - no additional data required
-1 - set available tickets
-    - 24 bit - ticket count
+1 - add available tickets
+    - 24 bit - ticket count (use negative to decrease)
 2 - set end of refunds
     - 32 bit - timestamp
 3 - set refund percentage
