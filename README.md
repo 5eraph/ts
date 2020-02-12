@@ -124,6 +124,11 @@ The contract owner is able to change available (not sold) tickets for cases of m
 
 - `int proof_ownership(int owner, cell data, cell signatureC)` - Provides a way to verify the owner of tickets. The verifier gives a one-time code to the owner which has to sign it. One-time code is passed as a data along with owner and cell holding the signature to the method. `proof_ownership` returns -1 if signature matches or 0 otherwise. *This method may be executed locally in VM as well. It is included in contract for cases when we would like to run without additional dependencies.*
 
+**:warning:Remember to specify transparent and easily verifiable specification of data and to educate your customers.:warning:**
+
+*NOTE: DATA should be simple one time code easily verifiable by the user and potential wallet software to avoid potential abuse of consumer by misleading them to sign queries or any data which could cause any harm*
+*Possible data specification: Random number in range 1-1000 + current date and time in format ddMMyyHHmm. E.g. random number 355 and date 120220 and time 1725 together: 3551202201725. This fits into 44 bits of data and is easily verifiable by software and consumer visually.*                                                                                                                                                    
+
 - `int owned_tickets(int owner)` - Takes public key and returns the number of tickets belonging to this public key.
 - `int available_tickets()` - Returns the number of tickets available for sale.
 - `int refunds_accepted()` - If refunds are accepted returns -1, otherwise 0.
