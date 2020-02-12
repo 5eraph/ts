@@ -110,6 +110,7 @@ The contract owner is able to change available (not sold) tickets for cases of m
 0 - init message - no additional data required
 1 - add available tickets
     - 24 bit - ticket count (use negative to decrease)
+    - **remember that users can buy in meantime so even when decreasing to 0, some tickets may be sold. Plan accordingly.**
 2 - set end of refunds
     - 32 bit - timestamp
 3 - set refund percentage
