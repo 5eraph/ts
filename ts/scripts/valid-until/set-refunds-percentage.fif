@@ -1,0 +1,44 @@
+"TonUtil.fif" include
+"Asm.fif" include
+
+{ ."usage: " @' $0 type ." <filename-base> <contract-addr> <refundsPercentage> <seq>" cr
+    ."<refundsPercentage>  - refunds percentage" cr
+    ."<seq>                - seq number from contract, use get_seq method to find last" cr
+    ."Sets refund percentage" cr
+} : usage
+// 2- -2 and '
+$# 4 - 0< { usage bye } if
+
+false constant bounce
+
+$1 =: file-base
+$2 false parse-load-address =: false 2=: contractAddr 
+$3 parse-int =: refundsPercentage
+$4 parse-int =: seq
+
+file-base +".pk" load-keypair nip constant event_pk
+
+60 constant timeout // timeout 60s
+
+now timeout + 1- dup =: query_timeout
+
+<b query_timeout 32 u, seq 16 u, 3 3 u, refundsPercentage 7 u, b> constant msg
+
+dup ."signing message: " msg <s csr. cr
+msg hashu event_pk ed25519_sign_uint constant signing_bin
+
+<b 
+    b{1000100} s, 
+    contractAddr addr, 
+    0 Gram, 
+    b{00} s,
+    signing_bin B, 
+    msg <s s, 
+b>
+
+dup ."External message for setting refunds percentage is " <s csr. cr
+2 boc+>B // create bag of cells with crc32 embedded
+dup Bx. cr // prints bag of cells in hex
+
+"queries/ts-set-refunds-percentage.boc" tuck B>file // saves query
+."(Saved set refunds percentage query to file " type .")" cr

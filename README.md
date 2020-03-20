@@ -104,6 +104,7 @@ The contract owner is able to change available (not sold) tickets for cases of m
 
 512 bit - contract owner signature
 64 bit - query id - also provides replay protection - holds timeout timestamp
+    - *Optionally if you do not need query id you can use valid-until version of contract which uses 32 bit unix timestamp as timeout*
 16 bit - seqno - replay protection within timeout window
 3 bit - operation 
 ... operation specific data:

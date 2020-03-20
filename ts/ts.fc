@@ -125,6 +125,9 @@ int refundValue(int price, int refundPercentage) {
     }
     _availableTickets = _availableTickets + count;
 
+    if (_seqno == 65535) { ;; reset seqno number 
+        _seqno = 0;
+    }
     store~udict_set_ref(256, owner, pack_record(_ownedTickets, _seqno + 1));
     store~udict_set_ref(256, 0, pack_uint(_availableTickets, 24));
     
@@ -165,7 +168,10 @@ int refundValue(int price, int refundPercentage) {
     if (_newOwnerOwnedTickets - 255 > 0) { ;; ticket limit per account exceeded
         return (store, 3);
     }
-
+    
+    if (_seqno == 65535) { ;; reset seqno number 
+        _seqno = 0;
+    }
     store~udict_set_ref(256, owner, pack_record(_ownedTickets, _seqno + 1));
     store~udict_set_ref(256, newOwner, pack_record(_newOwnerOwnedTickets, _newOwnerSeqno));
     return (store, 0);
