@@ -128,7 +128,7 @@ The contract owner is able to change available (not sold) tickets for cases of m
 **:warning:Remember to specify transparent and easily verifiable specification of data and to educate your customers.:warning:**
 
 *NOTE: DATA should be simple one time code easily verifiable by the user and potential wallet software to avoid potential abuse of consumer by misleading them to sign queries or any data which could cause any harm*
-*Possible data specification: Random number in range 1-1000 + current date and time in format ddMMyyHHmm. E.g. random number 355 and date 120220 and time 1725 together: 3551202201725. This fits into 44 bits of data and is easily verifiable by software and consumer visually.*                                                                                                                                                    
+*Possible data specification: Random number in range 1-1000 + current date and time in format ddMMyyHHmm. E.g. random number 355 and date 120220 and time 1725 together: 3551202201725. This fits into 44 bits of data and is easily verifiable by software and consumer visually. For potential verification strategies check out [Verification Strategies](https://github.com/5eraph/ts/blob/master/Verification Strategies.md).*                                                                                                                                                    
 
 - `int owned_tickets(int owner)` - Takes public key and returns the number of tickets belonging to this public key.
 - `int available_tickets()` - Returns the number of tickets available for sale.
